@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
@@ -15,7 +15,9 @@ import {
   updateDoc, 
   onSnapshot, 
   query, 
-  getDoc 
+  getDoc,
+  serverTimestamp,
+  orderBy
 } from 'firebase/firestore';
 import { 
   Home, 
@@ -38,7 +40,7 @@ import {
   MessageSquare,
   Sparkles,
   Info,
-  Lock,
+  Lock, 
   Mail,
   GraduationCap,
   Hash,
@@ -58,10 +60,15 @@ import {
   Megaphone,
   Zap,
   RotateCcw,
-  Edit3
+  Edit3,
+  Activity,
+  Trophy,
+  Check,
+  UserPlus,
+  Users
 } from 'lucide-react';
 
-// --- Firebase Initialization ---
+// --- Firebase Configuration ---
 const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
   apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: ""
 };
@@ -70,133 +77,153 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'MERGIFY-CAMPUS-V1';
 
-// --- Global Styles & Design Tokens ---
+// --- Global Styles ---
 const GlobalStyles = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+    * { font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: -0.015em; }
+    body { background: #f8fafc; margin: 0; color: #1e293b; -webkit-font-smoothing: antialiased; }
     
-    * {
-      font-family: 'Plus Jakarta Sans', sans-serif !important;
-      letter-spacing: -0.015em;
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
     }
-
-    body {
-      background: radial-gradient(circle at top, #f8fafc 0%, #eef2ff 100%);
-      margin: 0;
-      color: #1e293b;
-      -webkit-font-smoothing: antialiased;
+    .shine-bg {
+      background: linear-gradient(-45deg, #312e81, #4338ca, #581c87, #6d28d9);
+      background-size: 400% 400%;
+      animation: gradientShift 15s ease infinite;
     }
-
-    .glass-card {
-      background: rgba(255, 255, 255, 0.85);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid rgba(255, 255, 255, 0.5);
-    }
-
-    .premium-shadow {
-      box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.1);
-    }
-
-    @keyframes fadeSlideIn {
-      from { opacity: 0; transform: translateY(12px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .animate-premium {
-      animation: fadeSlideIn 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-
+    .glass-card { background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.5); }
+    .premium-shadow { box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.15); }
+    @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-premium { animation: fadeSlideIn 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
+    input::placeholder, textarea::placeholder { color: #94a3b8; font-weight: 500; }
     
-    input::placeholder { color: #94a3b8; font-weight: 500; }
-
-    .custom-range::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      height: 20px;
-      width: 20px;
-      border-radius: 50%;
-      background: #6366f1;
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(99, 102, 241, 0.4);
-    }
+    .custom-range { -webkit-appearance: none; width: 100%; height: 8px; background: rgba(0,0,0,0.05); border-radius: 4px; outline: none; }
+    .custom-range::-webkit-slider-thumb { -webkit-appearance: none; height: 20px; width: 20px; border-radius: 50%; background: #6366f1; cursor: pointer; box-shadow: 0 0 10px rgba(99, 102, 241, 0.4); }
   `}</style>
 );
 
-// --- UI Components ---
+// --- 1. Atomic UI Components ---
 
-const Logo = ({ className }) => (
-  <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="100" height="100" rx="28" fill="url(#gradLogo)" />
-    <path d="M25 70V30L50 50L75 30V70" stroke="white" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M35 75L50 63L65 75" stroke="rgba(255,255,255,0.4)" strokeWidth="5" strokeLinecap="round" />
-    <defs>
-      <linearGradient id="gradLogo" x1="0%" y1="0%" x2="100%" y2="100%">
-        <stop offset="0%" style={{ stopColor: '#6366f1' }} />
-        <stop offset="100%" style={{ stopColor: '#8b5cf6' }} />
-      </linearGradient>
-    </defs>
-  </svg>
-);
+function Logo({ className }) {
+  return (
+    <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="100" height="100" rx="28" fill="url(#gradLogo)" />
+      <path d="M25 70V30L50 50L75 30V70" stroke="white" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M35 75L50 63L65 75" stroke="rgba(255,255,255,0.4)" strokeWidth="5" strokeLinecap="round" />
+      <defs>
+        <linearGradient id="gradLogo" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style={{ stopColor: '#6366f1' }} />
+          <stop offset="100%" style={{ stopColor: '#8b5cf6' }} />
+        </linearGradient>
+      </defs>
+    </svg>
+  );
+}
 
-const MapPin = ({ size, className }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-    <circle cx="12" cy="10" r="3" />
-  </svg>
-);
+function CardFrame({ children, className = "" }) {
+  return (
+    <div className={`glass-card rounded-[2.5rem] premium-shadow h-full transition-all duration-300 p-6 md:p-8 ${className}`}>
+      {children}
+    </div>
+  );
+}
 
-const Card = ({ children, className = "", noPadding = false }) => (
-  <div className={`glass-card rounded-[2.5rem] premium-shadow h-full transition-all duration-300 ${noPadding ? '' : 'p-6 md:p-8'} ${className}`}>
-    {children}
-  </div>
-);
-
-const Button = ({ children, onClick, variant = "primary", className = "", type = "button", disabled = false }) => {
+function ButtonUI({ children, onClick, variant = "primary", className = "", type = "button", disabled = false }) {
   const styles = {
-    primary: "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 shadow-xl shadow-indigo-100",
+    primary: "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 shadow-xl",
     secondary: "bg-indigo-50 text-indigo-700 hover:bg-indigo-100",
     danger: "bg-rose-500 text-white hover:bg-rose-600 shadow-xl shadow-rose-100",
     outline: "border-2 border-slate-100 text-slate-600 hover:bg-slate-50",
     accent: "bg-white text-slate-900 shadow-lg border border-slate-100 hover:bg-slate-50"
   };
   return (
-    <button 
-      type={type}
-      disabled={disabled}
-      onClick={onClick} 
-      className={`px-6 py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 ${styles[variant]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}
-    >
+    <button type={type} disabled={disabled} onClick={onClick} className={`px-6 py-4 rounded-2xl font-bold transition-all active:scale-95 flex items-center justify-center gap-2 ${styles[variant]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
       {children}
     </button>
   );
-};
+}
 
-const ViewModeButton = ({ viewMode, toggleViewMode, className = "" }) => (
-  <button 
-    onClick={toggleViewMode}
-    title={`View Mode: ${viewMode}`}
-    className={`p-2.5 bg-white/60 backdrop-blur-md text-slate-600 rounded-xl hover:bg-white transition-all shadow-sm border border-slate-100 flex items-center gap-2 ${className}`}
-  >
-    {viewMode === 'auto' ? <Laptop size={18} /> : viewMode === 'mobile' ? <Smartphone size={18} /> : <Monitor size={18} />}
-    <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{viewMode}</span>
-  </button>
-);
+function ModalUI({ isOpen, onClose, title, children }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg animate-premium">
+        <CardFrame className="shadow-2xl">
+          <div className="flex items-center justify-between mb-6 uppercase">
+            <h3 className="text-2xl font-black text-slate-900 leading-none">{String(title)}</h3>
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-colors leading-none"><X size={24} /></button>
+          </div>
+          {children}
+        </CardFrame>
+      </div>
+    </div>
+  );
+}
 
-// --- Auth Components ---
+function AuthBackground() {
+  return (
+    <div className="absolute inset-0 -z-10 shine-bg overflow-hidden">
+      <div className="absolute top-[-10%] left-[-10%] w-[60%] h-[60%] bg-indigo-400/20 blur-[120px] rounded-full" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-purple-400/20 blur-[120px] rounded-full" />
+    </div>
+  );
+}
 
-const AuthBackground = () => (
-  <div className="absolute inset-0 -z-10 overflow-hidden">
-    <img
-      src="https://images.unsplash.com/photo-1541339907198-e08759dfc3f0?auto=format&fit=crop&q=80&w=2000"
-      className="w-full h-full object-cover opacity-20 blur-sm scale-105"
-      alt=""
-    />
-    <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/40 via-purple-900/20 to-slate-900/50" />
-  </div>
-);
+function ViewModeButton({ viewMode, toggleViewMode }) {
+  return (
+    <button onClick={toggleViewMode} className="p-2.5 bg-white/60 backdrop-blur-md text-slate-600 rounded-xl hover:bg-white transition-all shadow-sm border border-slate-100 flex items-center gap-2 uppercase">
+      {viewMode === 'auto' ? <Laptop size={18} /> : viewMode === 'mobile' ? <Smartphone size={18} /> : <Monitor size={18} />}
+      <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">{String(viewMode)}</span>
+    </button>
+  );
+}
 
-const LoginScreen = ({ role, onLogin, onRegister, onBack, error, viewMode, toggleViewMode }) => {
+function RoleButton({ icon, title, desc, onClick, color = "indigo" }) {
+  return (
+    <button onClick={onClick} className="w-full group bg-white/90 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white shadow-xl hover:shadow-2xl hover:shadow-indigo-200 transition-all flex items-center gap-6 text-left uppercase">
+      <div className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-transform group-hover:scale-110 flex-shrink-0 ${color === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-purple-50 text-purple-600'}`}>
+        {icon}
+      </div>
+      <div className="uppercase">
+        <h3 className="font-extrabold text-xl text-slate-900 tracking-tight leading-none uppercase">{String(title)}</h3>
+        <p className="text-[10px] text-slate-500 font-bold tracking-widest mt-2 uppercase opacity-60 leading-none">{String(desc)}</p>
+      </div>
+      <ChevronRight className="ml-auto text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+    </button>
+  );
+}
+
+function StatCard({ label, value, trend, colorClass = "text-slate-900" }) {
+  return (
+    <CardFrame className="group hover:bg-indigo-600 transition-all duration-500 p-8 uppercase shadow-2xl uppercase">
+      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-200 transition-colors uppercase leading-none">{String(label)}</p>
+      <div className="flex items-end justify-between uppercase leading-none uppercase">
+        <h4 className={`text-4xl font-black ${colorClass} group-hover:text-white transition-colors tracking-tighter`}>{String(value)}</h4>
+        <span className="text-[9px] font-black text-emerald-500 group-hover:text-indigo-100 tracking-widest uppercase leading-none">{String(trend)}</span>
+      </div>
+    </CardFrame>
+  );
+}
+
+function QuickAction({ icon, label, color, onClick }) {
+  return (
+    <button onClick={onClick} className="flex flex-col items-center justify-center p-6 rounded-[2rem] bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-indigo-400 transition-all group uppercase leading-none uppercase">
+      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${color}`}>
+        {icon}
+      </div>
+      <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 text-center leading-tight">{String(label)}</span>
+    </button>
+  );
+}
+
+// --- 2. Screen & Logic Fragments ---
+
+function LoginScreen({ role, onLogin, onRegister, onBack, error, viewMode, toggleViewMode }) {
   const [isRegister, setIsRegister] = useState(false);
   const [regNo, setRegNo] = useState('');
   const [fullName, setFullName] = useState('');
@@ -212,281 +239,479 @@ const LoginScreen = ({ role, onLogin, onRegister, onBack, error, viewMode, toggl
   };
 
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 overflow-hidden">
+    <div className="min-h-screen relative flex flex-col items-center justify-center p-6 overflow-hidden uppercase leading-none uppercase">
       <AuthBackground />
       <div className="absolute top-8 right-8">
         <ViewModeButton viewMode={viewMode} toggleViewMode={toggleViewMode} />
       </div>
-
-      <div className="w-full max-w-md animate-premium">
-        <div className="text-center mb-10">
-          <Logo className="w-20 h-20 mx-auto mb-6 drop-shadow-2xl" />
-          <h2 className="text-4xl font-black text-slate-900 tracking-tight uppercase leading-none">
+      <div className="w-full max-w-md animate-premium uppercase">
+        <div className="text-center mb-10 uppercase leading-none uppercase">
+          <Logo className="w-20 h-20 mx-auto mb-6 drop-shadow-2xl uppercase" />
+          <h2 className="text-4xl font-black text-white tracking-tight uppercase uppercase">
             {isRegister ? 'JOIN MERGIFY' : 'PORTAL ACCESS'}
           </h2>
-          <p className="text-indigo-600 font-bold uppercase text-[11px] tracking-[0.2em] mt-3">
-            PROCEEDING AS {role}
+          <p className="text-indigo-200 font-bold text-[11px] tracking-[0.2em] mt-3 uppercase">
+            PROCEEDING AS {String(role).toUpperCase()}
           </p>
         </div>
-
         {error && (
-          <div className="mb-6 p-4 bg-rose-50/90 backdrop-blur-md border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 animate-premium">
+          <div className="mb-6 p-4 bg-rose-50/90 backdrop-blur-md border border-rose-100 rounded-2xl flex items-center gap-3 text-rose-600 animate-premium leading-none uppercase">
             <AlertCircle size={20} />
-            <span className="text-sm font-bold uppercase">{error}</span>
+            <span className="text-sm font-bold uppercase">{String(error)}</span>
           </div>
         )}
-
-        <Card className="p-8 md:p-10 border-none shadow-2xl">
-          <form onSubmit={handleSubmit} className="space-y-5">
+        <CardFrame className="p-8 md:p-10 border-none shadow-2xl uppercase uppercase">
+          <form onSubmit={handleSubmit} className="space-y-5 uppercase">
             {isRegister && (
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
-                <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
-                  <input 
-                    required type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl transition-all font-bold text-slate-700" 
-                    placeholder="ENTER FULL NAME" 
-                  />
+              <div className="space-y-2 text-left uppercase">
+                <label className="text-[10px] font-black text-slate-400 tracking-widest ml-1 uppercase">Full Name</label>
+                <div className="relative group uppercase">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 uppercase" size={18} />
+                  <input required type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl transition-all font-bold text-slate-700 uppercase" placeholder="ENTER FULL NAME" />
                 </div>
               </div>
             )}
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Register Number</label>
-              <div className="relative group">
-                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
-                <input 
-                  required type="text" value={regNo} onChange={(e) => setRegNo(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl transition-all font-bold text-slate-700 font-mono" 
-                  placeholder="E.G. 20240001" 
-                />
+            <div className="space-y-2 text-left uppercase">
+              <label className="text-[10px] font-black text-slate-400 tracking-widest ml-1 uppercase">Register Number</label>
+              <div className="relative group uppercase">
+                <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 uppercase" size={18} />
+                <input required type="text" value={regNo} onChange={(e) => setRegNo(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl transition-all font-bold text-slate-700 font-mono uppercase" placeholder="E.G. 20240001" />
               </div>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Campus Email</label>
-              <div className="relative group">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
-                <input 
-                  required type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl transition-all font-bold text-slate-700" 
-                  placeholder="ID@CAMPUS.EDU" 
-                />
+            <div className="space-y-2 text-left uppercase">
+              <label className="text-[10px] font-black text-slate-400 tracking-widest ml-1 uppercase">Campus Email</label>
+              <div className="relative group uppercase">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 uppercase" size={18} />
+                <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-transparent focus:bg-white focus:border-indigo-500 rounded-2xl transition-all font-bold text-slate-700 uppercase" placeholder="ID@CAMPUS.EDU" />
               </div>
             </div>
-
-            <Button type="submit" variant="primary" className="w-full text-lg mt-4 uppercase tracking-wider" disabled={loading}>
-              {loading ? <Clock className="animate-spin" /> : (isRegister ? 'REGISTER NOW' : 'SIGN IN')}
-            </Button>
+            <ButtonUI type="submit" variant="primary" className="w-full text-lg mt-4 tracking-wider uppercase leading-none uppercase">
+              {loading ? <Clock className="animate-spin uppercase" /> : (isRegister ? 'REGISTER NOW' : 'SIGN IN')}
+            </ButtonUI>
           </form>
-
-          <div className="mt-8 pt-8 border-t border-slate-100 text-center">
-            <button 
-              onClick={() => setIsRegister(!isRegister)}
-              className="text-sm font-bold text-indigo-600 hover:text-purple-600 transition-colors uppercase"
-            >
+          <div className="mt-8 pt-8 border-t border-slate-100 text-center uppercase leading-none uppercase">
+            <button onClick={() => setIsRegister(!isRegister)} className="text-sm font-bold text-indigo-600 hover:text-purple-600 transition-colors uppercase">
               {isRegister ? 'ALREADY REGISTERED? LOG IN' : "NEW USER? REGISTER NOW"}
             </button>
           </div>
-        </Card>
-
-        <button onClick={onBack} className="w-full mt-10 text-slate-500 font-black text-[10px] hover:text-white transition-colors uppercase tracking-[0.4em]">
-          ← BACK TO SELECTION
-        </button>
+        </CardFrame>
+        <button onClick={onBack} className="w-full mt-10 text-white/50 font-black text-[10px] hover:text-white transition-colors tracking-[0.4em] uppercase leading-none uppercase">← BACK TO SELECTION</button>
       </div>
-    </div>
-  );
-};
-
-// --- Main Application ---
-
-export default function App() {
-  const [role, setRole] = useState(null); 
-  const [user, setUser] = useState(null); 
-  const [firebaseUser, setFirebaseUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('home');
-  const [isSplashScreen, setIsSplashScreen] = useState(true);
-  const [authError, setAuthError] = useState('');
-  const [viewMode, setViewMode] = useState('auto');
-  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
-
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const toggleViewMode = () => {
-    const modes = ['auto', 'mobile', 'desktop'];
-    const nextIndex = (modes.indexOf(viewMode) + 1) % modes.length;
-    setViewMode(modes[nextIndex]);
-  };
-
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
-      } catch (e) {
-        console.error("Auth initialization failed", e);
-      }
-    };
-    initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (u) => {
-      setFirebaseUser(u);
-      setTimeout(() => setIsSplashScreen(false), 800);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  const handleRegister = async (data) => {
-    if (!firebaseUser) return;
-    setAuthError('');
-    try {
-      const directoryRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_directory', data.regNo);
-      const existing = await getDoc(directoryRef);
-      if (existing.exists()) {
-        setAuthError('ID ALREADY IN USE');
-        return;
-      }
-      await setDoc(directoryRef, { regNo: data.regNo, name: data.fullName.toUpperCase(), role: data.role, uid: firebaseUser.uid });
-      const profileRef = doc(db, 'artifacts', appId, 'users', firebaseUser.uid, 'profile', 'data');
-      await setDoc(profileRef, { regNo: data.regNo, name: data.fullName.toUpperCase(), email: data.email, role: data.role, joinedAt: new Date().toISOString() });
-      setUser({ regNo: data.regNo, name: data.fullName.toUpperCase() });
-    } catch (err) { setAuthError('REGISTRATION FAILED'); }
-  };
-
-  const handleLogin = async (regNo, selectedRole) => {
-    if (!firebaseUser) return;
-    setAuthError('');
-    try {
-      const directoryRef = doc(db, 'artifacts', appId, 'public', 'data', 'user_directory', regNo);
-      const userSnap = await getDoc(directoryRef);
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (userData.role !== selectedRole) {
-          setAuthError(`ID IS NOT REGISTERED AS ${selectedRole.toUpperCase()}`);
-          return;
-        }
-        setUser({ regNo: userData.regNo, name: userData.name });
-      } else { setAuthError('ACCOUNT NOT FOUND'); }
-    } catch (err) { setAuthError('LOGIN FAILED'); }
-  };
-
-  if (isSplashScreen) {
-    return (
-      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-6 z-50">
-        <GlobalStyles />
-        <div className="w-32 h-32 mb-8 animate-premium">
-          <Logo className="w-full h-full drop-shadow-[0_20px_40px_rgba(99,102,241,0.3)]" />
-        </div>
-        <h1 className="text-5xl font-black text-indigo-950 tracking-tighter mb-4 uppercase leading-none">MERGIFY</h1>
-        <div className="w-12 h-1.5 bg-indigo-100 rounded-full overflow-hidden">
-          <div className="h-full bg-indigo-600 animate-[loading_1.5s_infinite_ease-in-out]" style={{width: '60%'}}></div>
-        </div>
-        <style>{`@keyframes loading { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }`}</style>
-      </div>
-    );
-  }
-
-  if (!role) {
-    return (
-      <div className="min-h-screen relative flex flex-col items-center justify-center p-6 md:p-8 overflow-hidden">
-        <GlobalStyles />
-        <AuthBackground />
-        <div className="absolute top-8 right-8">
-          <ViewModeButton viewMode={viewMode} toggleViewMode={toggleViewMode} />
-        </div>
-
-        <div className="w-full max-w-md animate-premium">
-          <div className="text-center mb-12">
-            <Logo className="w-24 h-24 mx-auto mb-6 drop-shadow-2xl" />
-            <h2 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none">MERGIFY.</h2>
-            <p className="text-indigo-900/60 font-bold uppercase text-xs tracking-[0.2em] mt-3">Unified Campus Platform</p>
-          </div>
-          <div className="space-y-4">
-            <RoleButton icon={<GraduationCap size={32} />} title="STUDENT PORTAL" desc="ACADEMICS, SAFETY & TOOLS" onClick={() => setRole('student')} />
-            <RoleButton icon={<UserCheck size={32} />} title="FACULTY PORTAL" desc="MANAGEMENT & MONITORING" onClick={() => setRole('teacher')} color="purple" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) return (
-    <>
-      <GlobalStyles />
-      <LoginScreen 
-        role={role} onLogin={handleLogin} onRegister={handleRegister}
-        onBack={() => setRole(null)} error={authError}
-        viewMode={viewMode} toggleViewMode={toggleViewMode}
-      />
-    </>
-  );
-
-  const isDesktopLayout = viewMode === 'desktop' || (viewMode === 'auto' && windowWidth >= 1024);
-  const showMobileNav = !isDesktopLayout;
-  const showDesktopNav = isDesktopLayout;
-
-  return (
-    <div className={`min-h-screen transition-all ${showDesktopNav ? 'pl-24' : 'pb-24'}`}>
-      <GlobalStyles />
-      <Header role={role} user={user} onLogout={() => {setUser(null); setRole(null);}} viewMode={viewMode} toggleViewMode={toggleViewMode} />
-      <main className={`max-w-6xl mx-auto p-6 md:p-10 transition-all ${viewMode === 'desktop' ? 'min-w-[1024px]' : ''}`}>
-        {role === 'student' ? (
-          <StudentContent activeTab={activeTab} user={user} isDesktop={isDesktopLayout} />
-        ) : (
-          <TeacherContent activeTab={activeTab} user={user} isDesktop={isDesktopLayout} />
-        )}
-      </main>
-      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} role={role} showMobileNav={showMobileNav} showDesktopNav={showDesktopNav} />
     </div>
   );
 }
 
-// --- Shared Elements ---
-
-const RoleButton = ({ icon, title, desc, onClick, color = "indigo" }) => (
-  <button onClick={onClick} className="w-full group bg-white/90 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white shadow-xl hover:shadow-2xl hover:shadow-indigo-200 transition-all flex items-center gap-6 text-left">
-    <div className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-transform group-hover:scale-110 flex-shrink-0 ${color === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 'bg-purple-50 text-purple-600'}`}>
-      {icon}
+function SettingsView({ user }) {
+  return (
+    <div className="max-w-xl mx-auto space-y-10 animate-premium text-center pb-20 uppercase uppercase">
+      <div className="relative inline-block uppercase leading-none">
+        <div className="w-32 h-32 rounded-[3rem] bg-indigo-900 mx-auto flex items-center justify-center text-white text-4xl font-black shadow-2xl shadow-indigo-200 uppercase uppercase">
+          {user?.name ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
+        </div>
+        <div className="absolute -bottom-2 -right-2 p-3 bg-emerald-500 text-white rounded-2xl border-4 border-white shadow-lg uppercase leading-none uppercase">
+          <ShieldCheck size={20} />
+        </div>
+      </div>
+      <div className="uppercase">
+        <h2 className="text-4xl font-black text-slate-900 tracking-tight uppercase leading-none uppercase">{String(user?.name)}</h2>
+        <p className="text-indigo-600 font-black text-[11px] uppercase tracking-[0.3em] mt-3 uppercase uppercase uppercase">ID NUMBER: {String(user?.regNo)}</p>
+      </div>
+      <CardFrame className="text-left divide-y divide-slate-100 p-0 overflow-hidden shadow-2xl uppercase">
+        <button className="w-full px-10 py-6 flex items-center justify-between hover:bg-slate-50 transition-colors uppercase leading-none uppercase uppercase">
+          <div className="flex items-center gap-5 uppercase leading-none">
+             <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl uppercase leading-none uppercase"><User size={20} /></div>
+             <div className="uppercase">
+               <p className="font-black text-slate-800 uppercase text-xs uppercase">Profile Details</p>
+               <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 uppercase leading-none opacity-60 uppercase">Manage account identity</p>
+             </div>
+          </div>
+          <ChevronRight size={18} className="text-slate-300 uppercase leading-none uppercase" />
+        </button>
+        <button onClick={() => window.location.reload()} className="w-full px-10 py-8 flex items-center justify-center gap-4 hover:bg-rose-50 transition-colors text-rose-600 font-black uppercase tracking-[0.2em] text-xs uppercase uppercase uppercase">
+          <LogOut size={20} className="uppercase leading-none uppercase" /> SIGN OUT OF SESSION
+        </button>
+      </CardFrame>
     </div>
-    <div>
-      <h3 className="font-extrabold text-xl text-slate-900 tracking-tight uppercase leading-none">{title}</h3>
-      <p className="text-xs text-slate-500 font-bold tracking-widest mt-2 uppercase opacity-60 leading-none">{desc}</p>
-    </div>
-    <ChevronRight className="ml-auto text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
-  </button>
-);
+  );
+}
 
-const Header = ({ role, user, onLogout, viewMode, toggleViewMode }) => (
-  <header className="bg-white/70 backdrop-blur-xl sticky top-0 z-30 px-6 md:px-10 py-5 flex items-center justify-between border-b border-slate-200/50 shadow-sm">
-    <div className="flex items-center gap-4">
-      <Logo className="w-10 h-10 flex-shrink-0" />
-      <div>
-        <h1 className="font-black text-xl text-slate-900 tracking-tighter leading-none uppercase">MERGIFY</h1>
-        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">{role} PORTAL</span>
+// --- 3. Teacher Module Components ---
+
+function TeacherAttendanceManager({ appId }) {
+  const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [markingId, setMarkingId] = useState(null);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'user_directory'), (snap) => {
+      const studentList = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(u => u.role === 'student');
+      setStudents(studentList.sort((a, b) => a.regNo.localeCompare(b.regNo)));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [appId]);
+
+  const markAttendance = async (student, status) => {
+    setMarkingId(student.id);
+    try {
+      const logRef = collection(db, 'artifacts', appId, 'public', 'data', 'attendance_logs');
+      await addDoc(logRef, { regNo: student.regNo, name: student.name, status, timestamp: serverTimestamp() });
+      setTimeout(() => setMarkingId(null), 500);
+    } catch (e) { console.error(e); setMarkingId(null); }
+  };
+
+  return (
+    <div className="space-y-10 animate-premium uppercase">
+      <header className="uppercase leading-none uppercase">
+        <h2 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 uppercase uppercase uppercase">MANAGEMENT</h2>
+        <h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase uppercase">ATTENDANCE HUB.</h3>
+      </header>
+      <CardFrame className="p-0 overflow-hidden shadow-2xl uppercase">
+        <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between uppercase leading-none uppercase uppercase">
+          <div className="flex items-center gap-4 uppercase"><Users className="text-indigo-600 uppercase" size={24} /><h4 className="font-black text-slate-800 uppercase text-xs uppercase uppercase">ENROLLED STUDENTS</h4></div>
+          <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-4 py-1.5 rounded-full uppercase">{students.length} TOTAL</span>
+        </div>
+        <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto no-scrollbar uppercase uppercase">
+          {loading ? <div className="p-20 text-center text-slate-400 font-bold uppercase"><Clock className="mx-auto mb-4 animate-spin uppercase uppercase" /> Loading registry...</div> : students.length === 0 ? <div className="p-20 text-center text-slate-400 font-bold uppercase uppercase">No students registered</div> : students.map(s => (
+            <div key={s.id} className="p-8 flex items-center justify-between hover:bg-slate-50 transition-colors uppercase leading-none uppercase">
+              <div className="flex items-center gap-6 uppercase"><div className="w-14 h-14 rounded-2xl bg-indigo-900 text-white flex items-center justify-center font-black text-xl uppercase uppercase">{s.name ? s.name[0] : '?'}</div><div className="uppercase"><p className="font-black text-slate-900 text-lg uppercase uppercase">{String(s.name)}</p><p className="text-[10px] text-slate-400 font-bold mt-2 uppercase uppercase">REG: {String(s.regNo)}</p></div></div>
+              <div className="flex items-center gap-3 uppercase uppercase">{markingId === s.id ? <div className="px-6 py-3 font-black text-[10px] text-indigo-400 uppercase uppercase">SYNCING...</div> : <><button onClick={() => markAttendance(s, 'PRESENT')} className="px-6 py-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 font-black text-[10px] uppercase hover:bg-emerald-600 hover:text-white transition-all uppercase uppercase">PRESENT</button><button onClick={() => markAttendance(s, 'ABSENT')} className="px-6 py-3 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 font-black text-[10px] uppercase hover:bg-rose-600 hover:text-white transition-all uppercase uppercase">ABSENT</button></>}</div>
+            </div>
+          ))}
+        </div>
+      </CardFrame>
+    </div>
+  );
+}
+
+function TeacherTimetableManager({ appId, initialTimetable }) {
+  const [timetable, setTimetable] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (initialTimetable?.length > 0) setTimetable(initialTimetable);
+    else {
+      const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+      const slots = ['09:00', '11:00', '14:00', '16:00'];
+      setTimetable(days.map(day => ({ day, slots: slots.map(time => ({ time, subject: 'FREE' })) })));
+    }
+  }, [initialTimetable]);
+
+  const updateSlot = (dayIdx, slotIdx, subject) => {
+    const next = [...timetable];
+    next[dayIdx].slots[slotIdx].subject = subject.toUpperCase();
+    setTimetable(next);
+  };
+
+  const publishTimetable = async () => {
+    setLoading(true);
+    try { await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'timetable', 'class_schedule'), { data: timetable, updatedAt: serverTimestamp() }); } catch (e) { console.error(e); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="space-y-10 animate-premium uppercase leading-none uppercase">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 uppercase leading-none uppercase"><div className="uppercase"><h2 className="text-[11px] font-black text-purple-600 uppercase tracking-[0.3em] mb-2 uppercase uppercase uppercase">PLANNER</h2><h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase uppercase">TIMETABLE HUB.</h3></div><ButtonUI onClick={publishTimetable} disabled={loading} variant="primary" className="px-8 py-4 rounded-2xl shadow-indigo-100 uppercase uppercase uppercase font-black uppercase uppercase">{loading ? <Clock className="animate-spin uppercase uppercase" /> : 'PUBLISH SCHEDULE'}</ButtonUI></header>
+      <CardFrame className="p-0 overflow-x-auto shadow-2xl uppercase leading-none uppercase">
+        <table className="w-full border-collapse text-left uppercase leading-none uppercase uppercase">
+          <thead>
+            <tr className="bg-slate-900 text-white uppercase uppercase uppercase"><th className="p-6 text-[10px] font-black border-r border-white/5 uppercase uppercase">TIME</th>{timetable.map(d => (<th key={d.day} className="p-6 text-center text-[10px] font-black min-w-[150px] uppercase uppercase">{String(d.day)}</th>))}</tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100 bg-white uppercase leading-none uppercase uppercase">
+            {timetable[0]?.slots.map((_, slotIdx) => (
+              <tr key={slotIdx} className="uppercase uppercase">
+                <td className="p-6 bg-slate-50 font-black text-indigo-600 text-xs border-r border-slate-100 uppercase uppercase">{timetable[0].slots[slotIdx].time}</td>
+                {timetable.map((day, dayIdx) => (
+                  <td key={dayIdx} className="p-4 uppercase uppercase">
+                    <input value={day.slots[slotIdx].subject} onChange={e => { const next = [...timetable]; next[dayIdx].slots[slotIdx].subject = e.target.value.toUpperCase(); setTimetable(next); }} className="w-full p-3 bg-white border-2 border-slate-100 rounded-xl font-black text-[10px] focus:border-indigo-500 uppercase transition-all uppercase uppercase" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </CardFrame>
+    </div>
+  );
+}
+
+function TeacherDashboardView({ user, reports }) {
+  const activeReports = reports.filter(r => r.status !== 'RESOLVED');
+  return (
+    <div className="space-y-10 animate-premium uppercase">
+      <header className="uppercase leading-none uppercase"><h2 className="text-[11px] font-black text-purple-600 uppercase tracking-[0.3em] mb-2 uppercase uppercase">FACULTY HUB</h2><h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-tight uppercase uppercase">WELCOME BACK,<br/>{user?.name ? user.name.split(' ')[0] : 'PROFESSOR'}</h3></header>
+      <div className={`grid gap-6 grid-cols-2 lg:grid-cols-4 uppercase uppercase`}><StatCard label="AVG ATTENDANCE" value="94.2%" trend="OPTIMAL" /><StatCard label="PENDING REPORTS" value={String(activeReports.length)} trend="ACTIVE" colorClass={activeReports.length > 0 ? "text-rose-600" : "text-slate-900"} /><StatCard label="SCHEDULED SESSIONS" value="04" trend="ON TRACK" /><StatCard label="CAMPUS STATUS" value={activeReports.some(r => r.type === 'SOS') ? "ALERT" : "SECURE"} trend="VERIFIED" colorClass={activeReports.some(r => r.type === 'SOS') ? "text-rose-600 animate-pulse" : "text-slate-900"} /></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase leading-none uppercase">
+        <CardFrame className="shadow-2xl uppercase leading-none uppercase"><h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs mb-8 uppercase uppercase">QUICK ACTIONS</h4><div className="grid grid-cols-2 gap-4 uppercase uppercase"><QuickAction icon={<Zap className="text-amber-500 uppercase uppercase" />} label="SOS ALERT" color="bg-amber-50" onClick={() => {}} /><QuickAction icon={<UserCheck className="text-indigo-500 uppercase uppercase" />} label="REGISTRY" color="bg-indigo-50" onClick={() => {}} /><QuickAction icon={<Megaphone className="text-purple-500 uppercase uppercase" />} label="BROADCAST" color="bg-purple-50" onClick={() => {}} /><QuickAction icon={<FileText className="text-emerald-500 uppercase uppercase" />} label="REPORTS" color="bg-emerald-50" onClick={() => {}} /></div></CardFrame>
+        <CardFrame className="shadow-2xl uppercase leading-none uppercase"><h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs mb-8 uppercase uppercase">REAL-TIME INBOX</h4><div className="space-y-4 uppercase leading-none max-h-[250px] overflow-y-auto no-scrollbar uppercase">{activeReports.length === 0 ? <p className="text-center py-10 text-slate-400 text-[10px] font-black uppercase uppercase">NO NEW ALERTS</p> : activeReports.map(r => (<div key={r.id} className={`p-5 rounded-3xl border flex items-start gap-4 uppercase transition-all ${r.type === 'SOS' ? 'bg-rose-50 border-rose-100 shadow-sm' : 'bg-slate-50 border-slate-100'} uppercase leading-none uppercase`}>{r.type === 'SOS' ? <Zap className="text-rose-500 shrink-0 mt-1 uppercase uppercase" size={20} /> : <AlertTriangle className="text-amber-500 shrink-0 mt-1 uppercase uppercase" size={20} />}<div className="uppercase leading-none uppercase uppercase"><p className={`text-xs font-black uppercase tracking-widest ${r.type === 'SOS' ? 'text-rose-700' : 'text-slate-700'} uppercase leading-none uppercase`}>{String(r.type)} ALERT</p><p className="text-[10px] text-slate-600 mt-2 font-bold opacity-60 uppercase line-clamp-1 uppercase leading-none uppercase">{String(r.subject || r.description)}</p></div></div>))}</div></CardFrame>
       </div>
     </div>
-    
-    <div className="flex items-center gap-3">
-      <ViewModeButton viewMode={viewMode} toggleViewMode={toggleViewMode} className="mr-2" />
-      <div className="hidden sm:block text-right mr-3">
-        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">SESSION ACTIVE</p>
-        <p className="text-sm font-extrabold text-slate-800 line-clamp-1 uppercase leading-none">{user.name}</p>
-      </div>
-      <button onClick={onLogout} className="p-3 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-2xl transition-all">
-        <LogOut size={20} />
-      </button>
-    </div>
-  </header>
-);
+  );
+}
 
-const Navigation = ({ activeTab, setActiveTab, role, showMobileNav, showDesktopNav }) => {
+function TeacherReportManager({ reports, onResolve }) {
+  const activeReports = reports.filter(r => r.status !== 'RESOLVED');
+  return (
+    <div className="space-y-10 animate-premium uppercase">
+      <header className="uppercase leading-none uppercase uppercase"><h2 className="text-[11px] font-black text-rose-600 uppercase tracking-[0.3em] mb-2 uppercase uppercase">MONITORING</h2><h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase">ISSUE QUEUE.</h3></header>
+      <CardFrame className="p-0 overflow-hidden shadow-2xl uppercase shadow-indigo-50 leading-none uppercase">
+        <div className="p-10 border-b border-slate-100 bg-slate-50/30 flex items-center justify-between uppercase leading-none uppercase uppercase"><h4 className="font-black text-slate-800 uppercase text-xs uppercase uppercase">ACTIVE TICKETS</h4><span className="text-[10px] font-black bg-rose-100 text-rose-600 px-4 py-1.5 rounded-full uppercase leading-none uppercase">REAL-TIME</span></div>
+        <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto no-scrollbar uppercase leading-none uppercase uppercase">
+          {activeReports.length === 0 ? <p className="text-center py-20 text-slate-400 font-black uppercase text-xs uppercase uppercase">NO ACTIVE TICKETS IN QUEUE</p> : activeReports.map(r => (
+            <div key={r.id} className="p-10 hover:bg-slate-50 transition-colors flex items-center justify-between uppercase uppercase">
+              <div className="flex items-center gap-8 uppercase uppercase"><div className={`w-16 h-16 rounded-3xl flex items-center justify-center font-black text-2xl uppercase uppercase uppercase ${r.type === 'SOS' ? 'bg-rose-500 text-white animate-pulse' : r.type === 'MAINTENANCE' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>{r.type[0]}</div><div className="uppercase leading-none uppercase uppercase uppercase"><p className="font-black text-slate-900 text-xl uppercase uppercase">{String(r.type)} REQUEST</p><p className="text-[11px] text-slate-400 font-bold uppercase mt-2 uppercase uppercase">{String(r.subject || r.description)}</p><p className="text-[9px] text-indigo-600 font-black uppercase mt-1 uppercase leading-none uppercase uppercase">LOC: {String(r.location || 'UNKNOWN')}</p></div></div>
+              <button onClick={() => onResolve(r.id)} className="px-8 py-4 rounded-2xl bg-indigo-600 text-white font-black text-[11px] uppercase hover:bg-indigo-700 transition-all shadow-lg leading-none uppercase uppercase uppercase">RESOLVE</button>
+            </div>
+          ))}
+        </div>
+      </CardFrame>
+    </div>
+  );
+}
+
+function TeacherCommsManager({ onPostAnnouncement }) {
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!subject || !message) return;
+    setLoading(true);
+    await onPostAnnouncement(subject, message);
+    setSubject(''); setMessage(''); setLoading(false);
+  };
+
+  return (
+    <div className="space-y-10 animate-premium uppercase leading-none uppercase">
+      <header className="uppercase leading-none uppercase uppercase uppercase"><h2 className="text-[11px] font-black text-rose-600 uppercase tracking-[0.3em] mb-2 uppercase uppercase uppercase">COMMS</h2><h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase">BROADCASTS.</h3></header>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase leading-none uppercase">
+        <CardFrame className="shadow-2xl uppercase leading-none uppercase"><h4 className="font-black text-slate-800 uppercase text-xs mb-10 uppercase uppercase">NEW BROADCAST</h4><div className="space-y-8 uppercase uppercase"><input className="w-full bg-slate-50 border-none rounded-2xl p-5 font-black text-sm focus:ring-2 focus:ring-indigo-500 uppercase uppercase" placeholder="SUBJECT" value={subject} onChange={e => setSubject(e.target.value.toUpperCase())} /><textarea rows="5" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-sm focus:ring-2 focus:ring-indigo-500 uppercase uppercase" placeholder="MESSAGE" value={message} onChange={e => setMessage(e.target.value.toUpperCase())} /><ButtonUI onClick={handleSubmit} disabled={loading} variant="primary" className="w-full py-6 rounded-[2rem] uppercase font-black uppercase leading-none uppercase">{loading ? <Clock className="animate-spin uppercase uppercase" /> : 'POST ANNOUNCEMENT'}</ButtonUI></div></CardFrame>
+        <CardFrame className="bg-slate-900 text-white border-none p-12 flex flex-col justify-between shadow-2xl uppercase uppercase"><div><Megaphone className="text-rose-400 mb-10 uppercase uppercase" size={56} /><h4 className="text-4xl font-black tracking-tight mb-6 uppercase uppercase">SOS OVERRIDE</h4><p className="text-slate-400 font-bold text-lg opacity-70 uppercase uppercase">TRIGGER EMERGENCY CAMPUS ALERT.</p></div><ButtonUI variant="danger" className="w-full py-8 text-2xl rounded-[2.5rem] mt-12 uppercase font-black uppercase leading-none uppercase">ACTIVATE</ButtonUI></CardFrame>
+      </div>
+    </div>
+  );
+}
+
+function TeacherContent({ activeTab, user, reports, onResolve, onPostAnnouncement, appId, timetableData, isDesktop }) {
+  switch (activeTab) {
+    case 'home': return <TeacherDashboardView user={user} reports={reports} />;
+    case 'attendance': return <TeacherAttendanceManager appId={appId} />;
+    case 'timetable': return <TeacherTimetableManager appId={appId} initialTimetable={timetableData} />;
+    case 'comms': return <TeacherCommsManager onPostAnnouncement={onPostAnnouncement} />;
+    case 'monitoring': return <TeacherReportManager reports={reports} onResolve={onResolve} />;
+    case 'settings': return <SettingsView user={user} />;
+    default: return null;
+  }
+}
+
+// --- 4. Student Module Components ---
+
+function StudentAIStudy() {
+  const [step, setStep] = useState(1);
+  const [timeframe, setTimeframe] = useState('WEEK');
+  const [activityCount, setActivityCount] = useState(3);
+  const [activities, setActivities] = useState([]);
+  const [timetable, setTimetable] = useState(null);
+
+  const startConfig = () => {
+    setActivities(Array.from({ length: activityCount }, (_, i) => ({ id: i, name: '', hours: 1 })));
+    setStep(2);
+  };
+
+  const generateTimetable = () => {
+    const days = timeframe === 'DAY' ? ['TODAY'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+    const slots = ['09:00', '11:00', '14:00', '16:00', '18:00'];
+    const newTimetable = days.map(day => ({ 
+      day, 
+      slots: slots.map((time, idx) => ({ 
+        time, 
+        activity: activities[idx % activities.length]?.name || 'REVISION', 
+        isBreak: idx % 3 === 2 
+      })) 
+    }));
+    setTimetable(newTimetable);
+    setStep(3);
+  };
+
+  const updateCell = (dayIdx, slotIdx, newName) => {
+    const next = [...timetable];
+    next[dayIdx].slots[slotIdx].activity = newName;
+    setTimetable(next);
+  };
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-10 animate-premium pb-20 uppercase leading-none uppercase uppercase">
+      <header className="text-center uppercase leading-none uppercase uppercase"><div className="inline-flex p-8 bg-indigo-100 text-indigo-600 rounded-[3rem] shadow-2xl shadow-indigo-100 mb-6 uppercase leading-none uppercase uppercase"><Sparkles size={48} className="uppercase uppercase" /></div><h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase">AI PLANNER.</h2><p className="text-slate-500 font-bold text-lg mt-4 opacity-70 tracking-[0.1em] uppercase leading-none uppercase uppercase">ACADEMIC ENGINE</p></header>
+      {step === 1 && (
+        <CardFrame className="max-w-2xl mx-auto shadow-2xl uppercase leading-none uppercase uppercase">
+          <div className="space-y-10 uppercase leading-none uppercase uppercase">
+            <div className="uppercase"><label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 block uppercase leading-none uppercase uppercase">PLANNING TIMEFRAME</label><div className="grid grid-cols-3 gap-4 uppercase leading-none uppercase uppercase">{['DAY', 'WEEK', 'MONTH'].map(t => (<button key={t} onClick={() => setTimeframe(t)} className={`p-6 rounded-3xl border-2 transition-all font-black uppercase leading-none uppercase uppercase ${timeframe === t ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md' : 'border-slate-100 text-slate-400 hover:border-indigo-200 uppercase uppercase'}`}>{t}</button>))}</div></div>
+            <div className="uppercase leading-none uppercase uppercase"><label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 block uppercase leading-none uppercase uppercase">NUMBER OF ACTIVITIES ({activityCount})</label><input type="range" min="1" max="8" value={activityCount} onChange={(e) => setActivityCount(parseInt(e.target.value))} className="w-full custom-range uppercase leading-none uppercase uppercase" /></div>
+            <ButtonUI onClick={startConfig} variant="primary" className="w-full py-6 rounded-[2rem] text-xl font-black tracking-widest uppercase leading-none uppercase uppercase">CONFIGURE <ArrowRight size={24} className="uppercase uppercase" /></ButtonUI>
+          </div>
+        </CardFrame>
+      )}
+      {step === 2 && (
+        <CardFrame className="max-w-2xl mx-auto shadow-2xl uppercase leading-none uppercase uppercase">
+          <div className="flex items-center gap-4 mb-8 uppercase leading-none uppercase uppercase"><button onClick={() => setStep(1)} className="p-3 bg-slate-100 rounded-2xl text-slate-500 hover:text-indigo-600 transition-all uppercase leading-none uppercase uppercase"><ArrowLeft size={20} className="uppercase uppercase" /></button><h4 className="font-black text-2xl uppercase tracking-tight leading-none uppercase uppercase uppercase">ACTIVITY DETAILS</h4></div>
+          <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 no-scrollbar uppercase leading-none uppercase uppercase">
+            {activities.map((act, idx) => (
+              <div key={act.id} className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex items-center gap-6 group hover:border-indigo-400 transition-all uppercase leading-none uppercase uppercase">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-lg leading-none uppercase uppercase uppercase uppercase">{idx + 1}</div>
+                <div className="flex-1 grid grid-cols-3 gap-4 uppercase leading-none uppercase uppercase">
+                  <div className="col-span-2 uppercase leading-none uppercase uppercase"><input value={act.name} onChange={(e) => { const next = [...activities]; next[idx].name = e.target.value.toUpperCase(); setActivities(next); }} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-sm focus:ring-2 focus:ring-indigo-500 uppercase leading-none uppercase uppercase" placeholder="ACTIVITY NAME" /></div>
+                  <div className="relative uppercase leading-none uppercase uppercase"><input type="number" value={act.hours} onChange={(e) => { const next = [...activities]; next[idx].hours = e.target.value; setActivities(next); }} className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-sm focus:ring-2 focus:ring-indigo-500 text-center uppercase leading-none uppercase uppercase" /><span className="absolute -top-3 left-3 bg-white px-2 text-[8px] font-black text-slate-400 uppercase leading-none uppercase uppercase">HRS</span></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <ButtonUI onClick={generateTimetable} variant="primary" className="w-full py-6 rounded-[2rem] mt-10 text-xl font-black tracking-widest uppercase leading-none uppercase uppercase">GENERATE <Zap size={24} className="uppercase uppercase" /></ButtonUI>
+        </CardFrame>
+      )}
+      {step === 3 && timetable && (
+        <div className="space-y-8 animate-premium uppercase leading-none uppercase uppercase">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4 uppercase leading-none uppercase uppercase">
+            <div className="text-left uppercase leading-none uppercase uppercase"><span className="text-[11px] font-black text-indigo-600 uppercase tracking-widest uppercase leading-none uppercase uppercase">PERSONAL PLANNER</span><h4 className="text-4xl font-black text-slate-900 uppercase leading-none mt-3 uppercase uppercase uppercase">{timeframe} SCHEDULE</h4></div>
+            <div className="flex gap-3 w-full md:w-auto uppercase leading-none uppercase uppercase"><ButtonUI onClick={() => setStep(1)} variant="secondary" className="flex-1 md:flex-none uppercase py-4 font-black uppercase leading-none uppercase uppercase"><RotateCcw size={18} className="uppercase uppercase" /> RESET</ButtonUI><ButtonUI variant="primary" className="flex-1 md:flex-none uppercase py-4 font-black uppercase leading-none uppercase uppercase"><CheckCircle2 size={18} className="uppercase uppercase" /> SAVE</ButtonUI></div>
+          </div>
+          <CardFrame className="p-0 overflow-x-auto border-none shadow-2xl uppercase shadow-indigo-100 leading-none uppercase uppercase">
+            <table className="w-full border-collapse uppercase leading-none text-left uppercase uppercase">
+              <thead>
+                <tr className="bg-slate-900 text-white uppercase leading-none uppercase uppercase"><th className="p-6 text-center font-black text-[10px] uppercase tracking-widest border-r border-white/5 uppercase leading-none uppercase uppercase">TIME</th>{(timeframe === 'DAY' ? ['TODAY'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']).map(d => (<th key={d} className="p-6 text-center font-black text-[10px] uppercase tracking-widest border-l border-white/5 min-w-[160px] uppercase leading-none uppercase uppercase">{String(d)}</th>))}</tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white uppercase leading-none uppercase uppercase">
+                {timetable[0]?.slots.map((slot, slotIdx) => (
+                  <tr key={slot.time} className="hover:bg-slate-50 transition-colors uppercase leading-none uppercase uppercase">
+                    <td className="p-6 flex flex-col items-center justify-center font-black bg-slate-50/50 border-r border-slate-100 uppercase leading-none uppercase uppercase"><span className="text-xs text-indigo-600 font-black uppercase leading-none uppercase uppercase">{slot.time}</span><Clock size={12} className="text-slate-300 mt-2 uppercase uppercase uppercase" /></td>
+                    {timetable.map((day, dayIdx) => (
+                      <td key={day.day} className="p-3 border-l border-slate-100 h-full uppercase leading-none uppercase uppercase">
+                        <div className={`h-full min-h-[90px] rounded-2xl p-4 border-2 transition-all flex flex-col justify-between group ${day.slots[slotIdx].isBreak ? 'bg-slate-100 border-slate-100 text-slate-400' : 'bg-white border-slate-100 hover:border-indigo-400 hover:shadow-lg uppercase uppercase'}`}>
+                          <div className="flex items-start justify-between uppercase leading-none uppercase uppercase"><textarea rows="2" value={day.slots[slotIdx].activity} onChange={(e) => updateCell(dayIdx, slotIdx, e.target.value.toUpperCase())} className="bg-transparent border-none p-0 w-full text-[11px] font-black uppercase resize-none focus:ring-0 no-scrollbar uppercase leading-none uppercase uppercase uppercase" />{!day.slots[slotIdx].isBreak && <Edit3 size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 uppercase uppercase uppercase" />}</div>
+                          <span className="text-[8px] font-bold opacity-50 uppercase tracking-widest uppercase leading-none uppercase uppercase">{day.slots[slotIdx].isBreak ? 'BUFFER' : 'SESSION'}</span>
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardFrame>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StudentDashboardView({ user, reports, announcements, timetableData }) {
+  const myReports = reports.filter(r => r.userId === auth.currentUser?.uid && r.status !== 'RESOLVED');
+  return (
+    <div className="space-y-10 animate-premium uppercase leading-none uppercase uppercase">
+      <header className="flex items-end justify-between uppercase uppercase uppercase">
+        <div className="uppercase"><h2 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none uppercase uppercase">OVERVIEW</h2><h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase">HI, {String(user?.name ? user.name.split(' ')[0] : 'USER')}!</h3></div>
+        <ButtonUI variant="outline" className="hidden sm:flex px-6 py-2.5 text-[11px] uppercase tracking-widest font-black leading-none uppercase uppercase uppercase uppercase">RECORDS</ButtonUI>
+      </header>
+      <div className={`grid gap-10 grid-cols-1 md:grid-cols-3 uppercase leading-none uppercase uppercase`}>
+        <CardFrame className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white border-none relative overflow-hidden flex flex-col justify-between p-8 uppercase shadow-2xl leading-none uppercase uppercase uppercase"><h4 className="font-black uppercase tracking-[0.2em] text-[10px] opacity-80 mb-6 uppercase leading-none uppercase uppercase uppercase">ATTENDANCE</h4><div className="flex items-center gap-8 mb-4 uppercase leading-none uppercase uppercase uppercase"><div className="relative w-32 h-32 flex items-center justify-center uppercase leading-none uppercase uppercase uppercase"><svg className="w-full h-full transform -rotate-90"><circle cx="64" cy="64" r="56" stroke="rgba(255,255,255,0.15)" strokeWidth="12" fill="transparent" /><circle cx="64" cy="64" r="56" stroke="white" strokeWidth="12" fill="transparent" strokeDasharray={352} strokeDashoffset={352 - (352 * 0.85)} strokeLinecap="round" /></svg><span className="absolute text-3xl font-black uppercase leading-none uppercase uppercase uppercase">85%</span></div><div className="uppercase leading-none uppercase uppercase uppercase uppercase"><p className="text-4xl font-black uppercase leading-none uppercase uppercase uppercase uppercase">STABLE</p><p className="text-xs opacity-70 font-bold tracking-wide mt-3 uppercase leading-none uppercase uppercase uppercase uppercase">+2 TO 90%</p></div></div><Sparkles className="absolute -right-8 -bottom-8 w-40 h-40 opacity-10 uppercase leading-none uppercase uppercase uppercase" /></CardFrame>
+        <CardFrame className="col-span-1 md:col-span-2 shadow-2xl uppercase leading-none uppercase uppercase uppercase">
+          <div className="flex justify-between items-center mb-8 uppercase leading-none uppercase uppercase uppercase uppercase"><h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs leading-none uppercase leading-none uppercase uppercase uppercase uppercase">CAMPUS BROADCASTS</h4><span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl uppercase tracking-widest leading-none uppercase leading-none uppercase uppercase uppercase uppercase">LIVE</span></div>
+          <div className="space-y-4 max-h-[300px] overflow-y-auto no-scrollbar uppercase leading-none uppercase uppercase uppercase uppercase">
+            {announcements.length === 0 ? <p className="text-center py-10 text-slate-400 font-black uppercase text-[10px] uppercase uppercase">NO RECENT NOTICES</p> : announcements.map(a => (
+              <div key={a.id} className="p-6 border border-slate-100 rounded-3xl bg-slate-50 flex items-center gap-6 uppercase transition-all hover:bg-white hover:shadow-sm uppercase uppercase uppercase">
+                <div className="p-3 bg-white rounded-2xl shadow-sm text-purple-600 uppercase uppercase uppercase"><Megaphone size={20} className="uppercase uppercase" /></div>
+                <div className="uppercase leading-none uppercase uppercase uppercase">
+                  <p className="text-xs font-black text-slate-900 uppercase uppercase uppercase uppercase uppercase">{String(a.subject)}</p>
+                  <p className="text-[10px] text-slate-500 font-bold mt-2 uppercase opacity-80 leading-relaxed uppercase uppercase uppercase uppercase">{String(a.message)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardFrame>
+      </div>
+      {timetableData?.length > 0 && (
+        <CardFrame className="shadow-2xl uppercase uppercase">
+          <div className="flex justify-between items-center mb-8 uppercase leading-none uppercase uppercase uppercase">
+            <h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs leading-none uppercase uppercase uppercase">CLASS TIMELINE</h4>
+            <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl leading-none uppercase uppercase uppercase uppercase">PUBLISHED</span>
+          </div>
+          <div className="overflow-x-auto no-scrollbar uppercase uppercase">
+            <table className="w-full text-left uppercase uppercase uppercase">
+              <thead>
+                <tr className="border-b border-slate-100 uppercase uppercase"><th className="pb-4 text-[10px] font-black text-slate-400 uppercase uppercase">TIME</th>{timetableData.map(d => <th key={d.day} className="pb-4 px-4 text-[10px] font-black text-slate-400 text-center uppercase uppercase uppercase">{String(d.day)}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50 uppercase uppercase">
+                {timetableData[0]?.slots.map((_, sIdx) => (
+                  <tr key={sIdx} className="uppercase uppercase">
+                    <td className="py-5 font-black text-xs text-indigo-600 uppercase uppercase uppercase uppercase">{String(timetableData[0].slots[sIdx].time)}</td>
+                    {timetableData.map((day, dIdx) => (
+                      <td key={dIdx} className="p-3 uppercase uppercase uppercase">
+                        <div className={`p-4 rounded-2xl text-[10px] font-black text-center uppercase uppercase uppercase uppercase ${day.slots[sIdx].subject === 'FREE' ? 'bg-slate-50 text-slate-300' : 'bg-indigo-50 text-indigo-700 shadow-sm'}`}>
+                          {String(day.slots[sIdx].subject)}
+                        </div>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </CardFrame>
+      )}
+    </div>
+  );
+}
+
+function StudentContent({ activeTab, user, reports, announcements, timetableData, onTriggerSOS, onOpenModal }) {
+  switch (activeTab) {
+    case 'home': return <StudentDashboardView user={user} reports={reports} announcements={announcements} timetableData={timetableData} />;
+    case 'campus': return (
+      <div className="space-y-10 animate-premium uppercase">
+        <header className="uppercase"><h2 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 leading-none uppercase uppercase uppercase uppercase uppercase">UTILITIES</h2><h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase uppercase uppercase uppercase">CAMPUS HUB.</h3></header>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase leading-none uppercase uppercase uppercase">
+          <QuickAction icon={<Search size={32} className="uppercase uppercase" />} label="REPORT LOST" color="text-blue-600 bg-blue-50" onClick={() => onOpenModal('lost')} />
+          <QuickAction icon={<Wrench size={32} className="uppercase uppercase" />} label="MAINTENANCE" color="text-emerald-600 bg-emerald-50" onClick={() => onOpenModal('maintenance')} />
+        </div>
+      </div>
+    );
+    case 'safety': return (
+      <div className="space-y-10 animate-premium uppercase leading-none uppercase uppercase uppercase uppercase">
+        <header className="flex flex-col sm:flex-row justify-between items-end gap-6 uppercase leading-none uppercase uppercase uppercase uppercase uppercase"><div className="uppercase leading-none uppercase uppercase uppercase uppercase uppercase uppercase"><h2 className="text-[11px] font-black text-rose-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none uppercase leading-none uppercase leading-none uppercase uppercase">GUARD</h2><h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase uppercase leading-none uppercase leading-none uppercase uppercase">SAFETY CENTER.</h3></div><ButtonUI variant="danger" onClick={onTriggerSOS} className="w-full sm:w-auto px-12 py-6 text-2xl animate-pulse rounded-[2rem] uppercase shadow-[0_0_40px_rgba(244,63,94,0.4)] leading-none uppercase uppercase uppercase uppercase uppercase"><Phone size={28} className="uppercase uppercase uppercase uppercase" /> SOS</ButtonUI></header>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase leading-none uppercase uppercase uppercase uppercase">
+          <CardFrame className="border-l-[10px] border-l-rose-500 bg-rose-50/20 p-10 shadow-2xl uppercase leading-none uppercase uppercase uppercase uppercase uppercase"><ShieldAlert className="text-rose-500 mb-8 uppercase uppercase uppercase uppercase uppercase" size={48} /><h4 className="text-3xl font-black text-slate-900 mb-4 uppercase leading-none uppercase uppercase uppercase uppercase uppercase uppercase">ANONYMOUS TIP</h4><p className="text-xs text-slate-500 font-bold leading-relaxed mb-10 opacity-70 uppercase leading-none uppercase uppercase uppercase uppercase uppercase">PRIVATE & SECURE REPORTING SYSTEM</p><ButtonUI variant="danger" onClick={() => onOpenModal('safety')} className="w-full uppercase tracking-widest py-5 rounded-[1.8rem] leading-none uppercase uppercase uppercase uppercase uppercase uppercase">FILE REPORT</ButtonUI></CardFrame>
+          <CardFrame className="p-10 shadow-2xl uppercase leading-none uppercase uppercase uppercase uppercase uppercase"><h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 uppercase leading-none uppercase uppercase uppercase uppercase">HELPLINES</h4><div className="space-y-5 uppercase leading-none uppercase uppercase uppercase uppercase uppercase">{['SECURITY', 'SAFETY CELL'].map(name => (<div key={name} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-[1.8rem] border border-slate-100 uppercase leading-none transition-all hover:border-indigo-600 uppercase leading-none uppercase uppercase uppercase uppercase"><span className="font-extrabold text-slate-700 text-sm tracking-wide uppercase leading-none uppercase uppercase uppercase uppercase uppercase uppercase">{String(name)}</span><button className="text-indigo-600 font-black text-[10px] uppercase tracking-widest bg-white px-5 py-2.5 rounded-xl shadow-sm border border-slate-100 uppercase leading-none hover:bg-indigo-600 hover:text-white transition-all uppercase leading-none uppercase uppercase uppercase uppercase">CONNECT</button></div>))}</div></CardFrame>
+        </div>
+      </div>
+    );
+    case 'ai': return <StudentAIStudy />;
+    case 'settings': return <SettingsView user={user} />;
+    default: return null;
+  }
+}
+
+// --- 5. Navigation & Global Layout Components ---
+
+function Header({ role, user, onLogout, viewMode, toggleViewMode }) {
+  return (
+    <header className="bg-white/70 backdrop-blur-xl sticky top-0 z-30 px-6 md:px-10 py-5 flex items-center justify-between border-b border-slate-200/50 shadow-sm uppercase leading-none uppercase">
+      <div className="flex items-center gap-4 leading-none uppercase uppercase uppercase">
+        <Logo className="w-10 h-10 flex-shrink-0 uppercase uppercase uppercase uppercase" />
+        <div className="uppercase leading-none uppercase uppercase uppercase uppercase">
+          <h1 className="font-black text-xl text-slate-900 tracking-tighter leading-none uppercase uppercase uppercase uppercase uppercase">MERGIFY</h1>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 uppercase leading-none uppercase uppercase uppercase uppercase uppercase"> {String(role).toUpperCase()} PORTAL </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 uppercase uppercase">
+        <ViewModeButton viewMode={viewMode} toggleViewMode={toggleViewMode} />
+        <div className="hidden sm:block text-right mr-3 leading-none uppercase uppercase uppercase uppercase uppercase">
+          <p className="text-[9px] font-black text-slate-400 tracking-widest uppercase leading-none uppercase uppercase uppercase">SESSION ACTIVE</p>
+          <p className="text-sm font-extrabold text-slate-800 line-clamp-1 uppercase leading-none mt-1 uppercase uppercase uppercase uppercase"> {String(user?.name).toUpperCase()} </p>
+        </div>
+        <button onClick={onLogout} title="Sign Out" className="p-3 bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 rounded-2xl transition-all leading-none uppercase uppercase uppercase uppercase uppercase"><LogOut size={20} className="uppercase uppercase uppercase" /></button>
+      </div>
+    </header>
+  );
+}
+
+function Navigation({ activeTab, setActiveTab, role, showMobileNav, showDesktopNav }) {
   const tabs = role === 'student' ? [
     { id: 'home', icon: GraduationCap, label: 'ACADEMICS' },
     { id: 'campus', icon: Wrench, label: 'UTILITIES' },
@@ -503,602 +728,200 @@ const Navigation = ({ activeTab, setActiveTab, role, showMobileNav, showDesktopN
   return (
     <>
       {showMobileNav && (
-        <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-2xl border-t border-slate-800 flex items-center justify-around h-20 z-40 shadow-2xl px-2">
+        <nav className="fixed bottom-0 left-0 right-0 bg-slate-900/95 backdrop-blur-2xl border-t border-slate-800 flex items-center justify-around h-20 z-40 shadow-2xl px-2 uppercase leading-none uppercase uppercase uppercase uppercase">
           {tabs.map((tab) => (
-            <button 
-              key={tab.id} 
-              onClick={() => setActiveTab(tab.id)} 
-              className={`flex flex-col items-center justify-center flex-1 h-full transition-all relative ${activeTab === tab.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}
-            >
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center justify-center flex-1 h-full transition-all relative ${activeTab === tab.id ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>
               <tab.icon size={22} className={activeTab === tab.id ? 'stroke-[2.5px]' : ''} />
-              <span className="text-[8px] mt-2 font-black uppercase tracking-widest text-center leading-none">{tab.label}</span>
-              {activeTab === tab.id && <div className="absolute bottom-2 w-1.5 h-1.5 bg-indigo-400 rounded-full shadow-[0_0_8px_rgba(129,140,248,0.8)]" />}
+              <span className="text-[8px] mt-2 font-black tracking-widest text-center leading-none uppercase uppercase uppercase uppercase uppercase"> {String(tab.label)} </span>
+              {activeTab === tab.id && <div className="absolute bottom-2 w-1.5 h-1.5 bg-indigo-400 rounded-full shadow-[0_0_8px_rgba(129,140,248,0.8)] uppercase uppercase uppercase uppercase" />}
             </button>
           ))}
         </nav>
       )}
-
       {showDesktopNav && (
-        <nav className="fixed left-0 top-0 bottom-0 w-24 bg-slate-900 flex flex-col items-center py-10 z-40 shadow-2xl">
-          <Logo className="w-12 h-12 mb-12 flex-shrink-0" />
-          <div className="flex flex-col gap-8 flex-1">
+        <nav className="fixed left-0 top-0 bottom-0 w-24 bg-slate-900 flex flex-col items-center py-10 z-40 shadow-2xl uppercase leading-none uppercase uppercase uppercase uppercase">
+          <Logo className="w-12 h-12 mb-12 flex-shrink-0 uppercase uppercase uppercase uppercase" />
+          <div className="flex flex-col gap-8 flex-1 uppercase uppercase leading-none uppercase uppercase uppercase">
             {tabs.map((tab) => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`group relative p-4 rounded-3xl transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-500/40' : 'text-slate-500 hover:text-slate-100'}`}>
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`group relative p-4 rounded-3xl transition-all ${activeTab === tab.id ? 'bg-indigo-600 text-white shadow-2xl shadow-indigo-500/40' : 'text-slate-500 hover:text-slate-100 uppercase uppercase uppercase uppercase'}`}>
                 <tab.icon size={24} />
-                <span className="absolute left-full ml-6 px-3 py-2 bg-slate-800 text-white text-[10px] font-bold uppercase tracking-[0.2em] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                  {tab.label}
-                </span>
+                <span className="absolute left-full ml-6 px-3 py-2 bg-slate-800 text-white text-[10px] font-bold uppercase tracking-[0.2em] rounded-xl opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 uppercase uppercase uppercase uppercase uppercase leading-none uppercase uppercase uppercase"> {String(tab.label)} </span>
               </button>
             ))}
           </div>
-          <div className="mt-auto">
-             <div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-500 hover:text-white transition-colors cursor-pointer" onClick={() => setActiveTab('settings')}>
-                <Settings size={22} />
-             </div>
-          </div>
+          <div className="mt-auto leading-none uppercase leading-none uppercase leading-none uppercase leading-none uppercase leading-none"><div className="w-12 h-12 rounded-2xl bg-slate-800 flex items-center justify-center text-slate-500 hover:text-white transition-colors cursor-pointer leading-none uppercase leading-none uppercase uppercase uppercase uppercase uppercase" onClick={() => setActiveTab('settings')}><Settings size={22} className="uppercase uppercase uppercase" /></div></div>
         </nav>
       )}
     </>
   );
-};
+}
 
-// --- Shared Views ---
+// --- 6. Main Root Controller ---
 
-const SettingsView = ({ user }) => (
-  <div className="max-w-xl mx-auto space-y-10 animate-premium text-center pb-20 uppercase">
-    <div className="relative inline-block uppercase">
-      <div className="w-32 h-32 rounded-[3rem] bg-indigo-900 mx-auto flex items-center justify-center text-white text-4xl font-black shadow-2xl shadow-indigo-200 uppercase">
-        {user.name ? user.name.split(' ').map(n => n[0]).join('') : 'U'}
-      </div>
-      <div className="absolute -bottom-2 -right-2 p-3 bg-emerald-500 text-white rounded-2xl border-4 border-white shadow-lg">
-        <ShieldCheck size={20} />
-      </div>
-    </div>
-    
-    <div>
-      <h2 className="text-4xl font-black text-slate-900 tracking-tight uppercase leading-none">{user.name}</h2>
-      <p className="text-indigo-600 font-black text-[11px] uppercase tracking-[0.3em] mt-3">ID NUMBER: {user.regNo}</p>
-    </div>
+export default function App() {
+  const [role, setRole] = useState(null); 
+  const [user, setUser] = useState(null); 
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('home');
+  const [isSplashScreen, setIsSplashScreen] = useState(true);
+  const [authError, setAuthError] = useState('');
+  const [viewMode, setViewMode] = useState('auto');
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [reports, setReports] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [timetable, setTimetable] = useState([]);
+  const [activeModal, setActiveModal] = useState(null); 
+  const [reportData, setReportData] = useState({ subject: '', location: '', description: '' });
 
-    <Card className="text-left divide-y divide-slate-100 p-0 overflow-hidden shadow-2xl uppercase">
-      <button className="w-full px-10 py-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-        <div className="flex items-center gap-5">
-           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl"><User size={20}/></div>
-           <div>
-             <p className="font-black text-slate-800 uppercase text-xs">Profile Details</p>
-             <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 opacity-60 leading-none">Manage account identity</p>
-           </div>
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const initAuth = async () => {
+    try {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      } else {
+        await signInAnonymously(auth);
+      }
+    } catch (e) { console.error("Auth failed", e); }
+  };
+
+  useEffect(() => {
+    initAuth();
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setFirebaseUser(u);
+      setTimeout(() => setIsSplashScreen(false), 800);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const unsubReports = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), (snapshot) => {
+      const data = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+      setReports(data.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0)));
+    });
+
+    const qAnns = query(collection(db, 'artifacts', appId, 'public', 'data', 'announcements'), orderBy('timestamp', 'desc'));
+    const unsubAnns = onSnapshot(qAnns, (snapshot) => {
+      setAnnouncements(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
+    const unsubTime = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'timetable', 'class_schedule'), (snapshot) => {
+      if (snapshot.exists()) setTimetable(snapshot.data().data);
+    });
+
+    return () => { unsubReports(); unsubAnns(); unsubTime(); };
+  }, [firebaseUser]);
+
+  const toggleViewMode = () => {
+    const modes = ['auto', 'mobile', 'desktop'];
+    const nextIndex = (modes.indexOf(viewMode) + 1) % modes.length;
+    setViewMode(modes[nextIndex]);
+  };
+
+  if (isSplashScreen) {
+    return (
+      <div className="fixed inset-0 bg-white flex flex-col items-center justify-center p-6 z-50 uppercase leading-none uppercase uppercase uppercase uppercase">
+        <GlobalStyles />
+        <Logo className="w-32 h-32 mb-8 animate-premium uppercase uppercase uppercase uppercase" />
+        <h1 className="text-5xl font-black text-indigo-950 tracking-tighter mb-4 uppercase uppercase uppercase uppercase">MERGIFY</h1>
+        <div className="w-12 h-1.5 bg-indigo-100 rounded-full overflow-hidden leading-none uppercase uppercase uppercase uppercase">
+          <div className="h-full bg-indigo-600 animate-[loading_1.5s_infinite_ease-in-out] uppercase uppercase uppercase uppercase" style={{width: '60%'}}></div>
         </div>
-        <ChevronRight size={18} className="text-slate-300" />
-      </button>
-      <button onClick={() => window.location.reload()} className="w-full px-10 py-8 flex items-center justify-center gap-4 hover:bg-rose-50 transition-colors text-rose-600 font-black uppercase tracking-[0.2em] text-xs">
-        <LogOut size={20} /> SIGN OUT OF SESSION
-      </button>
-    </Card>
-  </div>
-);
-
-const StatCard = ({ label, value, trend }) => (
-  <Card className="group hover:bg-indigo-600 transition-all duration-500 p-8 uppercase">
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 group-hover:text-indigo-200 transition-colors">{label}</p>
-    <div className="flex items-end justify-between">
-      <h4 className="text-4xl font-black text-slate-900 group-hover:text-white transition-colors tracking-tighter uppercase">{value}</h4>
-      <span className="text-[9px] font-black text-emerald-500 group-hover:text-indigo-100 tracking-widest uppercase">{trend}</span>
-    </div>
-  </Card>
-);
-
-const QuickAction = ({ icon, label, color }) => (
-  <button className="flex flex-col items-center justify-center p-6 rounded-[2rem] bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-indigo-400 transition-all group uppercase">
-    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 transition-transform group-hover:scale-110 ${color}`}>
-      {icon}
-    </div>
-    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500 text-center leading-tight uppercase">{label}</span>
-  </button>
-);
-
-// --- Student Sections ---
-
-const StudentContent = ({ activeTab, user, isDesktop }) => {
-  switch (activeTab) {
-    case 'home': return <StudentDashboard user={user} isDesktop={isDesktop} />;
-    case 'campus': return <StudentUtilities />;
-    case 'safety': return <StudentSafety />;
-    case 'ai': return <StudentAIStudy isDesktop={isDesktop} />;
-    case 'settings': return <SettingsView user={user} />;
-    default: return <StudentDashboard user={user} isDesktop={isDesktop} />;
+      </div>
+    );
   }
-};
 
-const StudentDashboard = ({ user, isDesktop }) => (
-  <div className="space-y-10 animate-premium">
-    <header className="flex items-end justify-between uppercase">
-      <div>
-        <h2 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 uppercase">MY OVERVIEW</h2>
-        <h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase">HI, {user.name ? user.name.split(' ')[0] : 'USER'}!</h3>
-      </div>
-      <div className="hidden sm:flex gap-3 uppercase">
-        <Button variant="outline" className="px-6 py-2.5 text-[11px] uppercase tracking-widest font-black uppercase leading-none">RECORDS</Button>
-      </div>
-    </header>
-
-    <div className={`grid gap-10 ${isDesktop ? 'grid-cols-3' : 'grid-cols-1'}`}>
-      <Card className="bg-gradient-to-br from-indigo-600 to-purple-600 text-white border-none relative overflow-hidden flex flex-col justify-between p-8 uppercase">
-        <h4 className="font-black uppercase tracking-[0.2em] text-[10px] opacity-80 mb-6 uppercase leading-none">LIVE ATTENDANCE</h4>
-        <div className="flex items-center gap-8 mb-4 uppercase">
-          <div className="relative w-32 h-32 flex items-center justify-center uppercase">
-            <svg className="w-full h-full transform -rotate-90">
-              <circle cx="64" cy="64" r="56" stroke="rgba(255,255,255,0.15)" strokeWidth="12" fill="transparent" />
-              <circle cx="64" cy="64" r="56" stroke="white" strokeWidth="12" fill="transparent" strokeDasharray={352} strokeDashoffset={352 - (352 * 0.85)} strokeLinecap="round" />
-            </svg>
-            <span className="absolute text-3xl font-black uppercase">85%</span>
+  if (!role) {
+    return (
+      <div className="min-h-screen relative flex flex-col items-center justify-center p-6 md:p-8 overflow-hidden uppercase leading-none uppercase uppercase uppercase uppercase">
+        <GlobalStyles />
+        <AuthBackground />
+        <div className="absolute top-8 right-8 uppercase leading-none uppercase uppercase uppercase">
+          <ViewModeButton viewMode={viewMode} toggleViewMode={toggleViewMode} />
+        </div>
+        <div className="max-w-md w-full animate-premium uppercase uppercase uppercase uppercase">
+          <div className="text-center mb-12 uppercase leading-none uppercase uppercase uppercase uppercase">
+            <Logo className="w-24 h-24 mx-auto mb-6 drop-shadow-2xl uppercase uppercase uppercase uppercase" />
+            <h2 className="text-5xl font-black text-white tracking-tighter uppercase leading-none uppercase uppercase uppercase uppercase">MERGIFY.</h2>
+            <p className="text-indigo-200 font-bold text-xs tracking-widest mt-3 leading-none uppercase uppercase uppercase uppercase uppercase">Unified Campus Platform</p>
           </div>
-          <div className="uppercase">
-            <p className="text-4xl font-black uppercase leading-none">STABLE</p>
-            <p className="text-xs opacity-70 font-bold tracking-wide mt-3 uppercase uppercase leading-none">+2 SESSIONS TO 90%</p>
+          <div className="space-y-4 text-left uppercase leading-none uppercase uppercase uppercase uppercase">
+            <RoleButton icon={<GraduationCap size={32} className="uppercase uppercase uppercase uppercase" />} title="STUDENT PORTAL" desc="ACADEMICS, SAFETY & TOOLS" onClick={() => setRole('student')} />
+            <RoleButton icon={<UserCheck size={32} className="uppercase uppercase uppercase uppercase" />} title="FACULTY PORTAL" desc="MANAGEMENT & MONITORING" onClick={() => setRole('teacher')} color="purple" />
           </div>
         </div>
-        <Sparkles className="absolute -right-8 -bottom-8 w-40 h-40 opacity-10" />
-      </Card>
-
-      <Card className={`${isDesktop ? 'col-span-2' : ''} uppercase`}>
-        <div className="flex justify-between items-center mb-8 uppercase">
-          <h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs uppercase leading-none">TODAY'S TIMELINE</h4>
-          <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl uppercase tracking-widest uppercase leading-none">ACTIVE SESSION</span>
-        </div>
-        <div className="space-y-6 uppercase">
-          <TimelineItem time="09:00" subject="Quantum Mechanics" room="HALL B2" status="COMPLETED" />
-          <TimelineItem time="11:15" subject="Data Science" room="LAB 402" status="LIVE NOW" active />
-          <TimelineItem time="14:00" subject="Elective: UI/UX" room="DESIGN STUDIO" status="UPCOMING" />
-        </div>
-      </Card>
-    </div>
-  </div>
-);
-
-const TimelineItem = ({ time, subject, room, status, active }) => (
-  <div className={`flex items-center gap-6 p-6 rounded-[2rem] border transition-all ${active ? 'bg-indigo-50 border-indigo-200 shadow-lg' : 'border-transparent hover:bg-slate-50'}`}>
-    <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center font-black ${active ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-200' : 'bg-slate-100 text-slate-400'}`}>
-      <span className="text-[10px] uppercase opacity-70 leading-none">{time.split(':')[1]}</span>
-      <span className="text-2xl leading-none mt-1">{time.split(':')[0]}</span>
-    </div>
-    <div className="flex-1 min-w-0 uppercase">
-      <p className={`font-black text-xl ${active ? 'text-indigo-950' : 'text-slate-800'}`}>{subject}</p>
-      <div className="flex items-center gap-3 text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2 uppercase leading-none">
-        <MapPin size={12} className="text-indigo-500" /> {room}
       </div>
-    </div>
-    <span className={`hidden sm:block text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-xl ${active ? 'bg-white text-indigo-600 shadow-sm border border-indigo-100' : 'bg-slate-50 text-slate-400'} leading-none uppercase`}>
-      {status}
-    </span>
-  </div>
-);
+    );
+  }
 
-const StudentUtilities = () => (
-  <div className="space-y-10 animate-premium uppercase">
-    <header className="uppercase">
-      <h2 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none">CAMPUS HUB</h2>
-      <h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase">UTILITIES.</h3>
-    </header>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase">
-      <ActionCard icon={<Search size={32} />} title="LOST & FOUND" desc="MISPLACED BELONGINGS" color="blue" />
-      <ActionCard icon={<Wrench size={32} />} title="MAINTENANCE" desc="FACILITY COMPLAINTS" color="emerald" />
-    </div>
-  </div>
-);
+  if (!user) return (
+    <>
+      <GlobalStyles />
+      <LoginScreen role={role} onLogin={async (id, r) => {
+        if (!firebaseUser) return;
+        const snap = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'user_directory', id));
+        if (snap.exists() && snap.data().role === r) setUser(snap.data());
+        else setAuthError("CREDENTIALS NOT VALID FOR THIS PORTAL");
+      }} onRegister={async (data) => {
+        if (!firebaseUser) return;
+        const ref = doc(db, 'artifacts', appId, 'public', 'data', 'user_directory', data.regNo);
+        await setDoc(ref, { regNo: data.regNo, name: data.fullName.toUpperCase(), role: data.role, uid: firebaseUser.uid });
+        setUser({ regNo: data.regNo, name: data.fullName.toUpperCase(), role: data.role });
+      }} onBack={() => setRole(null)} error={authError} viewMode={viewMode} toggleViewMode={toggleViewMode} />
+    </>
+  );
 
-const ActionCard = ({ icon, title, desc, color }) => (
-  <Card className="hover:border-indigo-400 transition-all group p-10 flex flex-col justify-between shadow-2xl uppercase">
-    <div className="uppercase">
-      <div className={`w-20 h-20 rounded-[1.8rem] flex items-center justify-center mb-8 transition-transform group-hover:scale-110 group-hover:rotate-3 ${color === 'blue' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'}`}>
-        {icon}
-      </div>
-      <h4 className="text-3xl font-black text-slate-900 tracking-tight mb-4 uppercase leading-none">{title}</h4>
-      <p className="text-xs text-slate-400 font-bold tracking-widest mb-10 opacity-70 uppercase leading-none">{desc}</p>
-    </div>
-    <Button variant="primary" className="w-full uppercase tracking-widest text-sm py-5 rounded-[1.8rem]">LAUNCH PORTAL</Button>
-  </Card>
-);
-
-const StudentSafety = () => (
-  <div className="space-y-10 animate-premium uppercase">
-    <header className="flex flex-col sm:flex-row justify-between items-end gap-6 uppercase">
-      <div className="uppercase">
-        <h2 className="text-[11px] font-black text-rose-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none">SAFETY CENTER</h2>
-        <h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase">CAMPUS GUARD.</h3>
-      </div>
-      <Button variant="danger" className="w-full sm:w-auto px-12 py-6 text-2xl animate-pulse rounded-[2rem] uppercase shadow-[0_0_40px_rgba(244,63,94,0.4)]">
-        <Phone size={28} /> SOS
-      </Button>
-    </header>
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase">
-      <Card className="border-l-[10px] border-l-rose-500 bg-rose-50/20 p-10 shadow-2xl uppercase">
-        <ShieldAlert className="text-rose-500 mb-8 uppercase" size={48} />
-        <h4 className="text-3xl font-black text-slate-900 mb-4 uppercase leading-none uppercase">ANONYMOUS TIP</h4>
-        <p className="text-xs text-slate-500 font-bold leading-relaxed mb-10 opacity-70 uppercase leading-none">PRIVATE & SECURE REPORTING SYSTEM</p>
-        <Button variant="danger" className="w-full uppercase tracking-widest py-5 rounded-[1.8rem]">FILE REPORT</Button>
-      </Card>
-      <Card className="p-10 shadow-2xl uppercase">
-        <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 uppercase leading-none">HELPLINES</h4>
-        <div className="space-y-5 uppercase">
-          {['MAIN SECURITY', 'SAFETY CELL', 'ANTI-HARASSMENT'].map(name => (
-            <div key={name} className="flex items-center justify-between p-6 bg-slate-50/50 rounded-[1.8rem] border border-slate-100 group hover:border-indigo-200 transition-all uppercase">
-              <span className="font-extrabold text-slate-700 text-sm tracking-wide uppercase leading-none">{name}</span>
-              <button className="text-indigo-600 font-black text-[10px] uppercase tracking-widest bg-white px-5 py-2.5 rounded-xl shadow-sm border border-slate-100 group-hover:bg-indigo-600 group-hover:text-white transition-all">CONNECT</button>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  </div>
-);
-
-// --- AI Planner Section ---
-
-const StudentAIStudy = ({ isDesktop }) => {
-  const [step, setStep] = useState(1);
-  const [timeframe, setTimeframe] = useState('WEEK');
-  const [activityCount, setActivityCount] = useState(3);
-  const [activities, setActivities] = useState([]);
-  const [timetable, setTimetable] = useState(null);
-
-  const startConfig = () => {
-    setActivities(Array.from({ length: activityCount }, (_, i) => ({ id: i, name: '', hours: 1 })));
-    setStep(2);
-  };
-
-  const generateTimetable = () => {
-    const days = timeframe === 'DAY' ? ['TODAY'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-    const slots = ['09:00', '11:00', '14:00', '16:00', '18:00'];
-    
-    const newTimetable = days.map(day => ({
-      day,
-      slots: slots.map((time, idx) => ({
-        time,
-        activity: activities[idx % activities.length]?.name || 'REVISION',
-        isBreak: idx % 3 === 2
-      }))
-    }));
-
-    setTimetable(newTimetable);
-    setStep(3);
-  };
-
-  const updateCell = (dayIdx, slotIdx, newName) => {
-    const next = [...timetable];
-    next[dayIdx].slots[slotIdx].activity = newName;
-    setTimetable(next);
-  };
+  const isDesktopLayout = viewMode === 'desktop' || (viewMode === 'auto' && windowWidth >= 1024);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 animate-premium pb-20 uppercase">
-      <header className="text-center uppercase">
-        <div className="inline-flex p-8 bg-indigo-100 text-indigo-600 rounded-[3rem] shadow-2xl shadow-indigo-100 mb-6 uppercase">
-          <Sparkles size={48} className="uppercase" />
+    <div className={`min-h-screen transition-all ${isDesktopLayout ? 'pl-24' : 'pb-24'} uppercase leading-none uppercase uppercase uppercase uppercase`}>
+      <GlobalStyles />
+      <Header role={role} user={user} onLogout={() => {setUser(null); setRole(null);}} viewMode={viewMode} toggleViewMode={toggleViewMode} />
+      <main className={`max-w-6xl mx-auto p-6 md:p-10 transition-all ${viewMode === 'desktop' ? 'min-w-[1024px]' : ''} uppercase leading-none uppercase uppercase uppercase uppercase`}>
+        {role === 'teacher' 
+          ? (
+            <TeacherContent 
+              activeTab={activeTab} 
+              user={user} 
+              reports={reports} 
+              onResolve={async (id) => await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'reports', id), { status: 'RESOLVED' })} 
+              onPostAnnouncement={async (s, m) => await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'announcements'), { subject: s, message: m, timestamp: serverTimestamp() })}
+              appId={appId}
+              timetableData={timetable}
+              isDesktop={isDesktopLayout}
+            />
+          ) : (
+            <StudentContent 
+              activeTab={activeTab} 
+              user={user} 
+              reports={reports} 
+              announcements={announcements} 
+              timetableData={timetable}
+              onTriggerSOS={() => addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), { type: 'SOS', priority: 'HIGH', status: 'PENDING', userId: firebaseUser.uid, timestamp: serverTimestamp() })} 
+              onOpenModal={setActiveModal} 
+            />
+          )
+        }
+      </main>
+      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} role={role} showMobileNav={!isDesktopLayout} showDesktopNav={isDesktopLayout} />
+
+      <ModalUI isOpen={!!activeModal} onClose={() => setActiveModal(null)} title={`New ${String(activeModal)} Report`}>
+        <div className="space-y-4 uppercase leading-none text-left uppercase uppercase uppercase uppercase uppercase">
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block leading-none uppercase uppercase uppercase uppercase">Subject</label><input value={reportData.subject} onChange={e => setReportData({...reportData, subject: e.target.value.toUpperCase()})} placeholder="E.G. LOST CALCULATOR" className="w-full bg-slate-50 border border-transparent rounded-2xl p-4 font-bold text-sm focus:bg-white focus:border-indigo-500 transition-all uppercase leading-none uppercase uppercase uppercase uppercase" /></div>
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block leading-none uppercase uppercase uppercase uppercase">Location</label><input value={reportData.location} onChange={e => setReportData({...reportData, location: e.target.value.toUpperCase()})} placeholder="E.G. BLOCK A" className="w-full bg-slate-50 border border-transparent rounded-2xl p-4 font-bold text-sm focus:bg-white focus:border-indigo-500 transition-all uppercase leading-none uppercase uppercase uppercase uppercase" /></div>
+          <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block leading-none uppercase uppercase uppercase uppercase">Details</label><textarea rows="3" value={reportData.description} onChange={e => setReportData({...reportData, description: e.target.value.toUpperCase()})} placeholder="PROVIDE DETAILS..." className="w-full bg-slate-50 border border-transparent rounded-2xl p-4 font-bold text-sm focus:bg-white focus:border-indigo-500 transition-all uppercase leading-none uppercase uppercase uppercase uppercase" /></div>
+          <ButtonUI onClick={() => {
+            addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'reports'), { ...reportData, type: activeModal.toUpperCase(), priority: 'NORMAL', status: 'PENDING', userId: firebaseUser.uid, timestamp: serverTimestamp() });
+            setActiveModal(null);
+            setReportData({ subject: '', location: '', description: '' });
+          }} className="w-full py-5 rounded-[1.8rem] text-sm uppercase leading-none uppercase uppercase uppercase uppercase">SUBMIT TICKET</ButtonUI>
         </div>
-        <h2 className="text-6xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase">AI PLANNER.</h2>
-        <p className="text-slate-500 font-bold text-lg mt-4 opacity-70 tracking-[0.1em] uppercase">ACADEMIC OPTIMIZATION ENGINE</p>
-      </header>
-
-      {step === 1 && (
-        <Card className="max-w-2xl mx-auto shadow-2xl uppercase">
-          <div className="space-y-10 uppercase">
-            <div className="uppercase">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 block uppercase">PLANNING TIMEFRAME</label>
-              <div className="grid grid-cols-3 gap-4 uppercase">
-                {['DAY', 'WEEK', 'MONTH'].map(t => (
-                  <button key={t} onClick={() => setTimeframe(t)} className={`p-6 rounded-3xl border-2 transition-all font-black uppercase ${timeframe === t ? 'border-indigo-600 bg-indigo-50 text-indigo-900 shadow-md' : 'border-slate-100 text-slate-400 hover:border-indigo-200'}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="uppercase">
-              <label className="text-[11px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6 block uppercase">ACTIVITIES ({activityCount})</label>
-              <input type="range" min="1" max="8" value={activityCount} onChange={(e) => setActivityCount(parseInt(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 custom-range uppercase" />
-            </div>
-
-            <Button onClick={startConfig} variant="primary" className="w-full py-6 rounded-[2rem] text-xl font-black tracking-widest uppercase">CONFIGURE <ArrowRight size={24}/></Button>
-          </div>
-        </Card>
-      )}
-
-      {step === 2 && (
-        <Card className="max-w-2xl mx-auto shadow-2xl uppercase">
-          <div className="flex items-center gap-4 mb-8 uppercase">
-            <button onClick={() => setStep(1)} className="p-3 bg-slate-100 rounded-2xl text-slate-500 hover:text-indigo-600 transition-all uppercase"><ArrowLeft size={20}/></button>
-            <h4 className="font-black text-2xl uppercase tracking-tight uppercase">DETAILS</h4>
-          </div>
-          <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 no-scrollbar uppercase">
-            {activities.map((act, idx) => (
-              <div key={act.id} className="p-6 bg-slate-50/50 rounded-[2rem] border border-slate-100 flex items-center gap-6 group hover:border-indigo-400 transition-all uppercase">
-                <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-lg uppercase leading-none">{idx + 1}</div>
-                <div className="flex-1 grid grid-cols-3 gap-4 uppercase">
-                   <div className="col-span-2 uppercase">
-                      <input 
-                        value={act.name} 
-                        onChange={(e) => {
-                          const next = [...activities];
-                          next[idx].name = e.target.value.toUpperCase();
-                          setActivities(next);
-                        }}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-sm focus:ring-2 focus:ring-indigo-500 uppercase" 
-                        placeholder="NAME (E.G. PHYSICS)" 
-                      />
-                   </div>
-                   <div className="relative uppercase">
-                      <input 
-                        type="number"
-                        value={act.hours} 
-                        onChange={(e) => {
-                          const next = [...activities];
-                          next[idx].hours = e.target.value;
-                          setActivities(next);
-                        }}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-black text-sm focus:ring-2 focus:ring-indigo-500 text-center uppercase" 
-                      />
-                      <span className="absolute -top-3 left-3 bg-white px-2 text-[8px] font-black text-slate-400 uppercase leading-none">HRS</span>
-                   </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <Button onClick={generateTimetable} variant="primary" className="w-full py-6 rounded-[2rem] mt-10 text-xl font-black tracking-widest uppercase">GENERATE <Zap size={24}/></Button>
-        </Card>
-      )}
-
-      {step === 3 && timetable && (
-        <div className="space-y-8 animate-premium uppercase">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4 uppercase">
-             <div className="text-left uppercase">
-                <span className="text-[11px] font-black text-indigo-600 uppercase tracking-widest uppercase leading-none">SUCCESSFULLY GENERATED</span>
-                <h4 className="text-4xl font-black text-slate-900 uppercase leading-none mt-3 uppercase">{timeframe} SCHEDULE</h4>
-             </div>
-             <div className="flex gap-3 w-full md:w-auto uppercase">
-                <Button onClick={() => setStep(1)} variant="secondary" className="flex-1 md:flex-none uppercase py-4 font-black uppercase leading-none"><RotateCcw size={18}/> RESET</Button>
-                <Button variant="primary" className="flex-1 md:flex-none uppercase py-4 font-black uppercase leading-none"><CheckCircle2 size={18}/> SAVE</Button>
-             </div>
-          </div>
-
-          <Card className="p-0 overflow-x-auto border-none shadow-2xl uppercase">
-            <table className="w-full border-collapse uppercase">
-              <thead>
-                <tr className="bg-slate-900 text-white uppercase">
-                  <th className="p-6 text-center font-black text-[10px] uppercase tracking-widest border-r border-white/5 uppercase leading-none">TIME</th>
-                  {(timeframe === 'DAY' ? ['TODAY'] : ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']).map(d => (
-                    <th key={d} className="p-6 text-center font-black text-[10px] uppercase tracking-widest border-l border-white/5 min-w-[160px] uppercase leading-none">{d}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white uppercase">
-                 {timetable[0].slots.map((slot, slotIdx) => (
-                   <tr key={slot.time} className="hover:bg-slate-50 transition-colors uppercase">
-                      <td className="p-6 flex flex-col items-center justify-center font-black bg-slate-50/50 border-r border-slate-100 uppercase">
-                         <span className="text-xs text-indigo-600 font-black uppercase leading-none">{slot.time}</span>
-                         <Clock size={12} className="text-slate-300 mt-2 uppercase" />
-                      </td>
-                      {timetable.map((day, dayIdx) => (
-                        <td key={day.day} className="p-3 border-l border-slate-100 h-full uppercase">
-                           <div className={`h-full min-h-[90px] rounded-2xl p-4 border-2 transition-all flex flex-col justify-between group ${day.slots[slotIdx].isBreak ? 'bg-slate-100 border-slate-100 text-slate-400' : 'bg-white border-slate-100 hover:border-indigo-400 hover:shadow-lg'}`}>
-                              <div className="flex items-start justify-between uppercase">
-                                 <textarea 
-                                   rows="2"
-                                   value={day.slots[slotIdx].activity}
-                                   onChange={(e) => updateCell(dayIdx, slotIdx, e.target.value.toUpperCase())}
-                                   className="bg-transparent border-none p-0 w-full text-[11px] font-black uppercase resize-none focus:ring-0 no-scrollbar uppercase leading-none"
-                                 />
-                                 {!day.slots[slotIdx].isBreak && <Edit3 size={10} className="text-slate-300 opacity-0 group-hover:opacity-100 uppercase" />}
-                              </div>
-                              <span className="text-[8px] font-bold opacity-50 uppercase tracking-widest uppercase leading-none">
-                                {day.slots[slotIdx].isBreak ? 'BUFFER' : 'SESSION'}
-                              </span>
-                           </div>
-                        </td>
-                      ))}
-                   </tr>
-                 ))}
-              </tbody>
-            </table>
-          </Card>
-        </div>
-      )}
+      </ModalUI>
     </div>
   );
-};
-
-// --- Teacher Sections ---
-
-const TeacherContent = ({ activeTab, user, isDesktop }) => {
-  switch (activeTab) {
-    case 'home': return <TeacherDashboard user={user} isDesktop={isDesktop} />;
-    case 'attendance': return <TeacherAttendanceManager isDesktop={isDesktop} />;
-    case 'timetable': return <TeacherTimetableManager isDesktop={isDesktop} />;
-    case 'comms': return <TeacherCommsManager />;
-    case 'monitoring': return <TeacherMonitoring isDesktop={isDesktop} />;
-    case 'settings': return <SettingsView user={user} />;
-    default: return <TeacherDashboard user={user} isDesktop={isDesktop} />;
-  }
-};
-
-const TeacherDashboard = ({ user, isDesktop }) => (
-  <div className="space-y-10 animate-premium">
-    <header className="uppercase">
-      <h2 className="text-[11px] font-black text-purple-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none">FACULTY HUB</h2>
-      <h3 className="text-5xl font-black text-slate-900 tracking-tighter uppercase leading-tight uppercase uppercase uppercase">WELCOME back,<br/>{user.name ? user.name.split(' ')[0] : 'PROFESSOR'}</h3>
-    </header>
-    <div className={`grid gap-6 ${isDesktop ? 'grid-cols-4' : 'grid-cols-2'} uppercase`}>
-      <StatCard label="AVG ATTENDANCE" value="94.2%" trend="OPTIMAL" />
-      <StatCard label="REPORTED ISSUES" value="08" trend="ACTIVE" />
-      <StatCard label="SCHEDULED SESSIONS" value="04" trend="ON TRACK" />
-      <StatCard label="CAMPUS ALERT" value="CLEAR" trend="VERIFIED" />
-    </div>
-    
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase">
-      <Card className="shadow-2xl uppercase">
-        <h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs mb-8 uppercase leading-none">QUICK ACTIONS</h4>
-        <div className="grid grid-cols-2 gap-4 uppercase">
-          <QuickAction icon={<Zap className="text-amber-500 uppercase" />} label="Emergency Alert" color="bg-amber-50" />
-          <QuickAction icon={<UserCheck className="text-indigo-500 uppercase" />} label="Take Attendance" color="bg-indigo-50" />
-          <QuickAction icon={<Megaphone className="text-purple-500 uppercase" />} label="Broadcast Notice" color="bg-purple-50" />
-          <QuickAction icon={<FileText className="text-emerald-500 uppercase" />} label="Generate Report" color="bg-emerald-50" />
-        </div>
-      </Card>
-      <Card className="shadow-2xl uppercase">
-        <h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs mb-8 uppercase leading-none">ANONYMOUS INBOX</h4>
-        <div className="space-y-4 uppercase">
-          {[1,2].map(i => (
-            <div key={i} className="p-5 bg-rose-50/50 border border-rose-100 rounded-3xl flex items-start gap-4 uppercase">
-              <ShieldAlert className="text-rose-500 shrink-0 mt-1 uppercase" size={20} />
-              <div className="uppercase">
-                <p className="text-xs font-black text-rose-700 uppercase tracking-widest uppercase leading-none">TIP #{1024 + i}</p>
-                <p className="text-xs text-slate-600 mt-3 font-bold opacity-60 uppercase leading-none">UNVERIFIED SAFETY REPORT</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  </div>
-);
-
-const TeacherAttendanceManager = ({ isDesktop }) => (
-  <div className="space-y-10 animate-premium">
-    <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 uppercase">
-      <div className="uppercase">
-        <h2 className="text-[11px] font-black text-indigo-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none">ATTENDANCE MANAGEMENT</h2>
-        <h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase uppercase uppercase">MARK & ANALYZE.</h3>
-      </div>
-      <div className="flex gap-3 uppercase">
-        <Button variant="outline" className="px-6 py-2.5 text-[10px] uppercase tracking-widest font-black uppercase leading-none"><FileText size={16}/> REPORTS</Button>
-        <Button variant="primary" className="px-6 py-2.5 text-[10px] uppercase tracking-widest font-black uppercase leading-none"><CheckCircle2 size={16}/> FINALIZE</Button>
-      </div>
-    </header>
-
-    <div className={`grid gap-10 ${isDesktop ? 'grid-cols-3' : 'grid-cols-1'} uppercase`}>
-      <Card className="col-span-1 md:col-span-2 p-0 overflow-hidden border-none shadow-2xl uppercase">
-        <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/30 uppercase">
-          <h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs uppercase uppercase leading-none">PHY-402 REGISTRY</h4>
-          <span className="text-[10px] font-black bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full uppercase tracking-tighter uppercase uppercase uppercase leading-none">48 ENROLLED</span>
-        </div>
-        <div className="divide-y divide-slate-100 uppercase">
-          {[1,2,3,4,5].map(i => (
-            <div key={i} className="p-8 flex items-center justify-between hover:bg-slate-50 transition-colors group uppercase">
-              <div className="flex items-center gap-6 uppercase">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black group-hover:bg-indigo-600 group-hover:text-white transition-all uppercase text-xl leading-none">S{i}</div>
-                <div className="uppercase">
-                  <p className="font-extrabold text-slate-900 uppercase uppercase uppercase uppercase uppercase leading-none">STUDENT {i}</p>
-                  <p className="text-[10px] text-slate-400 font-black tracking-widest font-mono uppercase uppercase uppercase leading-none mt-2">ID: 2024000{i}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 uppercase">
-                <button className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-500 hover:text-white transition-all font-black text-[10px] uppercase uppercase leading-none">PRESENT</button>
-                <button className="p-3 rounded-2xl bg-slate-50 text-slate-400 border border-slate-100 hover:bg-rose-500 hover:text-white transition-all font-black text-[10px] uppercase uppercase leading-none">ABSENT</button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
-    </div>
-  </div>
-);
-
-const TeacherTimetableManager = ({ isDesktop }) => (
-  <div className="space-y-10 animate-premium">
-    <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 uppercase">
-      <div className="uppercase">
-        <h2 className="text-[11px] font-black text-purple-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none">PLANNING</h2>
-        <h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase">TIMETABLE EDITOR.</h3>
-      </div>
-      <Button variant="primary" className="px-8 py-3 text-[10px] uppercase tracking-widest font-black uppercase uppercase leading-none"><PlusCircle size={20}/> NEW SESSION</Button>
-    </header>
-
-    <Card className="p-0 overflow-hidden border-none shadow-2xl uppercase">
-      <div className="grid grid-cols-6 divide-x divide-slate-100 bg-slate-900 text-white uppercase">
-        <div className="p-6 uppercase leading-none"></div>
-        {['MON', 'TUE', 'WED', 'THU', 'FRI'].map(d => (
-          <div key={d} className="p-6 text-center font-black text-[10px] uppercase tracking-widest uppercase leading-none">{d}</div>
-        ))}
-      </div>
-      <div className="divide-y divide-slate-100 uppercase">
-        {['09:00', '11:15', '14:00'].map(t => (
-          <div key={t} className="grid grid-cols-6 divide-x divide-slate-100 hover:bg-slate-50 transition-colors uppercase">
-            <div className="p-6 flex flex-col items-center justify-center font-black text-xs text-indigo-600 uppercase uppercase leading-none">{t} <Clock size={12} className="text-slate-300 mt-2 uppercase"/></div>
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className="p-5 group uppercase">
-                <div className={`h-full min-h-[70px] rounded-[1.8rem] p-4 text-[11px] font-black uppercase border-2 transition-all cursor-pointer flex items-center justify-center leading-none ${i === 2 ? 'bg-purple-600 text-white border-purple-600 shadow-xl' : 'bg-white border-slate-100 text-slate-300 hover:border-indigo-400 hover:text-indigo-600'}`}>
-                   {i === 2 ? 'PHY-402' : 'EMPTY'}
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </Card>
-  </div>
-);
-
-const TeacherMonitoring = ({ isDesktop }) => (
-  <div className="space-y-10 animate-premium">
-    <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 uppercase">
-      <div className="uppercase">
-        <h2 className="text-[11px] font-black text-rose-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none">MONITORING</h2>
-        <h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase uppercase uppercase">DEFAULTER LIST.</h3>
-      </div>
-      <Button variant="secondary" className="px-8 py-3 text-[10px] uppercase font-black uppercase shadow-lg uppercase leading-none">BULK WARNINGS</Button>
-    </header>
-
-    <Card className="p-0 overflow-hidden border-none shadow-2xl uppercase">
-      <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-rose-50/20 uppercase">
-        <h4 className="font-black text-rose-700 uppercase tracking-[0.2em] text-xs uppercase leading-none">ATTENDANCE BELOW 75%</h4>
-        <AlertTriangle className="text-rose-500 uppercase" size={24} />
-      </div>
-      <div className="divide-y divide-slate-100 uppercase">
-        {[1, 2, 3].map(i => (
-          <div key={i} className="p-10 flex items-center justify-between hover:bg-slate-50 transition-colors uppercase group cursor-pointer">
-            <div className="flex items-center gap-8 uppercase">
-              <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-500 flex items-center justify-center font-black group-hover:bg-rose-500 group-hover:text-white transition-all text-2xl uppercase leading-none">D{i}</div>
-              <div className="uppercase">
-                <p className="font-black text-slate-900 text-xl uppercase uppercase leading-none">STUDENT {i}</p>
-                <p className="text-[11px] text-slate-400 font-black tracking-[0.2em] mt-3 uppercase uppercase leading-none">CURRENT: {62 - (i*5)}%</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 uppercase">
-               <button className="text-[11px] font-black uppercase tracking-widest px-6 py-3 rounded-2xl bg-rose-50 text-rose-600 border border-rose-100 hover:bg-rose-600 hover:text-white transition-all leading-none uppercase">ISSUE WARNING</button>
-               <ChevronRight className="text-slate-300 group-hover:text-indigo-600 transition-all uppercase leading-none" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </Card>
-  </div>
-);
-
-const TeacherCommsManager = () => (
-  <div className="space-y-10 animate-premium">
-    <header className="uppercase">
-      <h2 className="text-[11px] font-black text-rose-600 uppercase tracking-[0.3em] mb-2 uppercase leading-none">COMMUNICATIONS</h2>
-      <h3 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-none uppercase">ANNOUNCEMENTS.</h3>
-    </header>
-
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-10 uppercase">
-      <Card className="shadow-2xl uppercase">
-        <h4 className="font-black text-slate-800 uppercase tracking-[0.2em] text-xs mb-10 uppercase leading-none">BROADCAST TOOL</h4>
-        <div className="space-y-8 uppercase">
-          <input className="w-full bg-slate-50 border-none rounded-2xl p-5 font-black text-sm focus:ring-2 focus:ring-indigo-500 uppercase leading-none" placeholder="SUBJECT" />
-          <textarea rows="5" className="w-full bg-slate-50 border-none rounded-2xl p-5 font-bold text-sm focus:ring-2 focus:ring-indigo-500 uppercase leading-none" placeholder="MESSAGE"></textarea>
-          <Button variant="primary" className="w-full py-6 rounded-[2rem] uppercase tracking-widest font-black uppercase leading-none">SEND TO ALL STUDENTS</Button>
-        </div>
-      </Card>
-
-      <Card className="bg-slate-900 text-white border-none p-12 flex flex-col justify-between shadow-2xl shadow-rose-100 uppercase">
-        <div className="uppercase">
-          <Megaphone className="text-rose-400 mb-10 uppercase" size={56} />
-          <h4 className="text-4xl font-black tracking-tight mb-6 uppercase leading-tight">EMERGENCY<br/>OVERRIDE</h4>
-          <p className="text-slate-400 font-bold text-lg leading-relaxed uppercase opacity-70 uppercase leading-none">TRIGGER CAMPUS-WIDE EMERGENCY ALERT SYSTEM.</p>
-        </div>
-        <Button variant="danger" className="w-full py-8 text-2xl rounded-[2.5rem] mt-12 shadow-[0_0_60px_rgba(244,63,94,0.4)] uppercase leading-none">ACTIVATE SOS</Button>
-      </Card>
-    </div>
-  </div>
-);
+}
