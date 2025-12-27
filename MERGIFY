@@ -70,8 +70,14 @@ import {
 } from 'lucide-react';
 
 // --- Firebase Configuration ---
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-  apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: ""
+const firebaseConfig = {
+  apiKey: "AIzaSyAnCQnIj6D2cEnrt-_dULHIDnVdej2LNrs",
+  authDomain: "mergify-28a08.firebaseapp.com",
+  projectId: "mergify-28a08",
+  storageBucket: "mergify-28a08.firebasestorage.app",
+  messagingSenderId: "740585918112",
+  appId: "1:740585918112:web:c43c048b80dd62972a03c5",
+  measurementId: "G-KYT6B3SXGQ"
 };
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -106,21 +112,41 @@ const CustomStyles = () => (
 
 // --- 1. Atomic UI Components ---
 
-function Logo({ className }) {
+function Logo({ className = "" }) {
   return (
-    <svg viewBox="0 0 100 100" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      viewBox="0 0 100 100"
+      width="100"
+      height="100"
+      className={`w-24 h-24 max-w-[96px] max-h-[96px] ${className}`}
+      preserveAspectRatio="xMidYMid meet"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
       <rect width="100" height="100" rx="28" fill="url(#gradLogo)" />
-      <path d="M25 70V30L50 50L75 30V70" stroke="white" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M35 75L50 63L65 75" stroke="rgba(255,255,255,0.4)" strokeWidth="5" strokeLinecap="round" />
+      <path
+        d="M25 70V30L50 50L75 30V70"
+        stroke="white"
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M35 75L50 63L65 75"
+        stroke="rgba(255,255,255,0.4)"
+        strokeWidth="5"
+        strokeLinecap="round"
+      />
       <defs>
         <linearGradient id="gradLogo" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" style={{ stopColor: '#6366f1' }} />
-          <stop offset="100%" style={{ stopColor: '#8b5cf6' }} />
+          <stop offset="0%" stopColor="#6366f1" />
+          <stop offset="100%" stopColor="#8b5cf6" />
         </linearGradient>
       </defs>
     </svg>
   );
 }
+
 
 function CardFrame({ children, className = "" }) {
   return (
@@ -1046,7 +1072,9 @@ export default function App() {
         </div>
         <div className="max-w-md w-full animate-in fade-in slide-in-from-bottom-8 duration-700">
           <div className="text-center mb-12">
-            <Logo className="w-24 h-24 mx-auto mb-6 drop-shadow-2xl" />
+            <div className="w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+              <Logo className="w-full h-full drop-shadow-2xl" />
+            </div>
             <h2 className="text-5xl font-black text-white tracking-tighter uppercase leading-none">MERGIFY.</h2>
             <p className="text-indigo-200 font-bold text-xs tracking-[0.4em] mt-3 uppercase opacity-80">Unified Campus Platform</p>
           </div>
